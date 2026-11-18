@@ -21,6 +21,7 @@
     --seal:#A93A2C;
     --sign-h:clamp(238px,50vh,430px);
     --card-h:clamp(84px,13vh,112px);
+    --arena-h:clamp(126px,23vh,200px);
     --font:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
     --ease:cubic-bezier(.2,.75,.25,1);
   }
@@ -369,7 +370,8 @@
   .hint.on{opacity:1}
 
   /* ── 玩法二：排除法 ───────────────── */
-  .elim-lead{
+  .elim-lead,
+  .pk-lead{
     margin:-8px 0 14px;
     font-size:11.5px;
     letter-spacing:.04em;
@@ -454,14 +456,17 @@
   }
 
   .view-elim[data-state="result"] .cards,
-  .view-elim[data-state="accepted"] .cards{
+  .view-elim[data-state="accepted"] .cards,
+  .view-pk[data-state="accepted"] .cards{
     display:flex;
     justify-content:center;
   }
   .view-elim[data-state="result"] .card,
-  .view-elim[data-state="accepted"] .card{display:none}
+  .view-elim[data-state="accepted"] .card,
+  .view-pk[data-state="accepted"] .card{display:none}
   .view-elim[data-state="result"] .card.winner,
-  .view-elim[data-state="accepted"] .card.winner{
+  .view-elim[data-state="accepted"] .card.winner,
+  .view-pk[data-state="accepted"] .card.winner{
     display:flex;
     width:min(100%,250px);
     height:auto;
@@ -519,6 +524,50 @@
     text-align:center;
   }
 
+  /* ── 玩法三：守擂 ─────────────────── */
+  .cards.duel{
+    display:grid;
+    grid-template-columns:1fr auto 1fr;
+    align-items:stretch;
+    gap:clamp(6px,1.6vw,12px);
+    width:100%;
+    max-width:470px;
+    margin:0 auto;
+  }
+  .cards.duel.solo{
+    grid-template-columns:1fr;
+    max-width:250px;
+  }
+
+  .duel .card{
+    height:var(--arena-h);
+    padding:14px 10px;
+    gap:9px;
+  }
+  .duel .card-name{font-size:clamp(16px,2.5vh,21px)}
+  .duel .card-tags{font-size:11px;gap:7px}
+
+  .duel .vs{
+    align-self:center;
+    width:20px;
+    text-align:center;
+    color:var(--muted);
+    font-size:11.5px;
+    letter-spacing:0;
+    user-select:none;
+    -webkit-user-select:none;
+  }
+  .view-pk[data-state="accepted"] .duel .vs{display:none}
+  .pk-lead{transition:opacity .25s var(--ease)}
+  .view-pk[data-state="accepted"] .pk-lead{opacity:0}
+
+  /* 新上场的牌：轻轻浮上来，不抢戏 */
+  .card.in{animation:cardIn .24s var(--ease) both}
+  @keyframes cardIn{
+    from{opacity:0;transform:translateY(5px)}
+    to{opacity:1;transform:none}
+  }
+
   /* ── 玩法切换 ─────────────────────── */
   .switch{
     position:fixed;
@@ -546,6 +595,8 @@
     font-family:inherit;
     font-size:12.5px;
     letter-spacing:.1em;
+    white-space:nowrap;
+    flex:0 0 auto;
     cursor:pointer;
     transition:background .2s,color .2s;
   }
@@ -584,22 +635,22 @@
 
   /* ── 窄屏 ─────────────────────────── */
   @media (max-width:520px){
-    :root{--sign-h:clamp(212px,44vh,320px);--card-h:clamp(78px,12.2vh,96px)}
+    :root{--sign-h:clamp(212px,44vh,320px);--card-h:clamp(78px,12.2vh,96px);--arena-h:clamp(132px,24vh,170px)}
     h1{letter-spacing:.28em;text-indent:.28em;margin-bottom:14px}
     .action-slot{min-width:156px;height:44px}
     .btn{height:44px}
     .chips{gap:6px}
     .chip{padding:0 11px;font-size:12px}
     .cards{grid-template-columns:repeat(2,1fr);gap:9px}
-    .switch button{padding:0 15px}
+    .switch button{padding:0 13px}
   }
 
   @media (max-height:640px){
-    :root{--sign-h:clamp(190px,42vh,260px);--card-h:clamp(70px,11.2vh,86px)}
+    :root{--sign-h:clamp(190px,42vh,260px);--card-h:clamp(70px,11.2vh,86px);--arena-h:clamp(104px,17vh,128px)}
     h1{margin-bottom:12px}
     .action-slot{margin-top:14px}
     .chips{margin-top:14px}
-    .elim-lead{display:none}
+    .elim-lead,.pk-lead{display:none}
     .count{margin-top:9px}
   }
 
@@ -613,7 +664,8 @@
     .seal.stamped{animation:stampFlat .15s linear forwards}
     @keyframes stampFlat{from{opacity:0}to{opacity:.88;transform:none}}
     .card{transition:opacity .15s linear}
-    .card.deny,.view-elim[data-state="result"] .card.winner,.card.winner .card-stamp{animation:none}
+    .card.deny,.card.in,
+    .view-elim[data-state="result"] .card.winner,.card.winner .card-stamp{animation:none}
   }
 </style>
 </head>
@@ -669,6 +721,26 @@
       </div>
     </div>
 
+    <div class="view view-pk" id="viewPk" data-state="face" role="tabpanel" aria-labelledby="tabPk" hidden>
+
+      <p class="pk-lead">点你想留的那个，另一个换掉</p>
+
+      <div class="cards duel" id="duelCards"></div>
+
+      <p class="count" id="pkCount"></p>
+
+      <div class="action-slot">
+        <button class="btn" id="pkPrimary">就吃它</button>
+        <p class="closing" id="pkClosing">就它了，去吃吧</p>
+      </div>
+
+      <div class="minor-actions">
+        <button class="link" id="pkSwap">都不想，换一个</button>
+        <button class="link" id="pkUndo" hidden>再想想</button>
+        <button class="link" id="pkCopy" hidden>复制</button>
+      </div>
+    </div>
+
     <div class="chips" id="chips">
       <button class="chip" id="chipNoSpicy" aria-pressed="false">不吃辣</button>
       <button class="chip" id="chipGentle" aria-pressed="false">清淡点</button>
@@ -683,6 +755,7 @@
 <nav class="switch" role="tablist" aria-label="玩法切换">
   <button role="tab" id="tabSign" aria-selected="true" aria-controls="viewSign">摇一签</button>
   <button role="tab" id="tabElim" aria-selected="false" aria-controls="viewElim">排除法</button>
+  <button role="tab" id="tabPk" aria-selected="false" aria-controls="viewPk">守擂</button>
 </nav>
 
 <button class="sound" id="sound" aria-label="音效开关" aria-pressed="false" title="音效">
@@ -891,8 +964,10 @@
   /* ───────── 元素 ───────── */
   var viewSign  = document.getElementById("viewSign");
   var viewElim  = document.getElementById("viewElim");
+  var viewPk    = document.getElementById("viewPk");
   var tabSign   = document.getElementById("tabSign");
   var tabElim   = document.getElementById("tabElim");
+  var tabPk     = document.getElementById("tabPk");
   var sign      = document.getElementById("sign");
   var nameEl    = document.getElementById("signName");
   var descEl    = document.getElementById("signDesc");
@@ -918,6 +993,13 @@
   var elimUndo    = document.getElementById("elimUndo");
   var elimCopy    = document.getElementById("elimCopy");
 
+  var duelEl    = document.getElementById("duelCards");
+  var pkCount   = document.getElementById("pkCount");
+  var pkPrimary = document.getElementById("pkPrimary");
+  var pkSwap    = document.getElementById("pkSwap");
+  var pkUndo    = document.getElementById("pkUndo");
+  var pkCopy    = document.getElementById("pkCopy");
+
   /* ───────── 存储 ───────── */
   function read(k, fallback){
     try{
@@ -936,7 +1018,10 @@
   }
 
   var S = {
-    view: read("jtsmc.view", "sign") === "elim" ? "elim" : "sign",
+    view: (function(){
+      var v = read("jtsmc.view", "sign");
+      return (v === "elim" || v === "pk") ? v : "sign";
+    })(),
     state: "idle",
     dish: null,
     gentle: false,
@@ -957,6 +1042,20 @@
     cards: [],
     winner: null,
     seen: []
+  };
+
+  /* 守擂自己的会话状态，不持久化 */
+  var P = {
+    state: "face",
+    champion: null,
+    challenger: null,
+    beaten: [],
+    seen: [],
+    basePool: [],
+    relaxed: false,
+    streak: 0,
+    rounds: 0,
+    busy: false
   };
 
   /* 逻辑日期：凌晨 4 点翻篇 */
@@ -1179,6 +1278,11 @@
   function setEstate(s){
     E.state = s;
     viewElim.setAttribute("data-state", s);
+  }
+
+  function setPstate(s){
+    P.state = s;
+    viewPk.setAttribute("data-state", s);
   }
 
   function setChipsFaded(v){
@@ -1512,41 +1616,50 @@
     return out;
   }
 
+  /* 一张牌：两个玩法共用同一套结构 */
+  function cardButton(d){
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "card";
+    b.dataset.name = d.name;
+    b.setAttribute("aria-pressed", "false");
+
+    var n = document.createElement("span");
+    n.className = "card-name";
+    n.textContent = d.name;
+
+    var tags = document.createElement("span");
+    tags.className = "card-tags";
+    cardTags(d).forEach(function(t){
+      var i = document.createElement("i");
+      i.textContent = t;
+      tags.appendChild(i);
+    });
+
+    var desc = document.createElement("span");
+    desc.className = "card-desc";
+    desc.textContent = d.desc;
+
+    var stamp = document.createElement("span");
+    stamp.className = "card-stamp";
+    stamp.setAttribute("aria-hidden", "true");
+    stamp.textContent = "吃";
+
+    b.appendChild(n);
+    b.appendChild(tags);
+    b.appendChild(desc);
+    b.appendChild(stamp);
+    return b;
+  }
+
   function renderCards(){
     cardsEl.textContent = "";
     E.cards.forEach(function(item){
-      var d = item.d;
-      var b = document.createElement("button");
-      b.type = "button";
-      b.className = "card" + (item.off ? " off" : "");
-      b.dataset.name = d.name;
-      b.setAttribute("aria-pressed", String(!!item.off));
-
-      var n = document.createElement("span");
-      n.className = "card-name";
-      n.textContent = d.name;
-
-      var tags = document.createElement("span");
-      tags.className = "card-tags";
-      cardTags(d).forEach(function(t){
-        var i = document.createElement("i");
-        i.textContent = t;
-        tags.appendChild(i);
-      });
-
-      var desc = document.createElement("span");
-      desc.className = "card-desc";
-      desc.textContent = d.desc;
-
-      var stamp = document.createElement("span");
-      stamp.className = "card-stamp";
-      stamp.setAttribute("aria-hidden", "true");
-      stamp.textContent = "吃";
-
-      b.appendChild(n);
-      b.appendChild(tags);
-      b.appendChild(desc);
-      b.appendChild(stamp);
+      var b = cardButton(item.d);
+      if (item.off){
+        b.classList.add("off");
+        b.setAttribute("aria-pressed", "true");
+      }
       cardsEl.appendChild(b);
     });
   }
@@ -1744,26 +1857,269 @@
     }
   }
 
+  /* ───────── 玩法三：守擂 ───────── */
+  var PK_HINT_ROUND = 6;
+
+  function kindOf(d){ return d.tags.indexOf("荤") > -1 ? "荤" : "素"; }
+  function hasNoodle(d){ return d.tags.indexOf("面") > -1; }
+  function isSea(d){ return d.tags.indexOf("海鲜") > -1; }
+
+  /* 味道的对立面：清淡 ↔ 辣/重口；辣与重口同属「重」，不算反差 */
+  function flavorFoes(f){
+    if (f === "清淡") return ["辣", "重口"];
+    return ["清淡"];
+  }
+
+  /* 还没上过场的牌：今日已摇过的不发；整池都摇过时放宽，并在开局时说明 */
+  function pkAvailable(){
+    return P.basePool.filter(function(d){
+      if (P.seen.indexOf(d.name) > -1) return false;
+      if (!P.relaxed && S.rolled.indexOf(d.name) > -1) return false;
+      return true;
+    });
+  }
+
+  /* 挑战者逐级放宽：方向相反 → 味道相反 → 荤素相反 → 任意 */
+  function pkChallenger(hero){
+    var base = pkAvailable();
+    if (!base.length) return null;
+
+    var heroF = flavorOf(hero);
+    var heroKind = kindOf(hero);
+    var heroNoodle = hasNoodle(hero);
+    var heroSea = isSea(hero);
+    var foes = flavorFoes(heroF);
+
+    var tiers = [
+      function(d){
+        return foes.indexOf(flavorOf(d)) > -1 && kindOf(d) !== heroKind &&
+               (!heroSea || !isSea(d)) && (!heroNoodle || !hasNoodle(d));
+      },
+      function(d){
+        return foes.indexOf(flavorOf(d)) > -1 && kindOf(d) !== heroKind;
+      },
+      function(d){ return foes.indexOf(flavorOf(d)) > -1; },
+      function(d){ return kindOf(d) !== heroKind; },
+      function(){ return true; }
+    ];
+
+    for (var i = 0; i < tiers.length; i++){
+      var seg = base.filter(tiers[i]);
+      if (seg.length) return pick(seg);
+    }
+    return null;
+  }
+
+  function findDuelEl(name){
+    var kids = duelEl.children;
+    for (var i = 0; i < kids.length; i++){
+      if (kids[i].dataset.name === name) return kids[i];
+    }
+    return null;
+  }
+
+  function renderDuel(animateRight){
+    duelEl.textContent = "";
+    duelEl.classList.toggle("solo", !P.challenger);
+    if (!P.champion) return;
+
+    duelEl.appendChild(cardButton(P.champion));
+
+    if (P.challenger){
+      var vs = document.createElement("span");
+      vs.className = "vs";
+      vs.setAttribute("aria-hidden", "true");
+      vs.textContent = "或";
+      duelEl.appendChild(vs);
+
+      var right = cardButton(P.challenger);
+      if (animateRight) right.classList.add("in");
+      duelEl.appendChild(right);
+    }
+  }
+
+  function announceDuel(){
+    if (!P.champion) return;
+    liveEl.textContent = P.challenger
+      ? "现在比的是 " + P.champion.name + " 和 " + P.challenger.name
+      : "现在只剩 " + P.champion.name;
+  }
+
+  function syncPkChrome(){
+    var n = P.beaten.length;
+
+    if (P.state === "face"){
+      pkCount.textContent = n ? "已淘汰 " + n + " 道" : "";
+      pkPrimary.hidden = false;
+      pkPrimary.textContent = "就吃它";
+      pkSwap.hidden = !P.challenger;
+      pkUndo.hidden = true;
+      pkCopy.hidden = true;
+    } else {
+      pkCount.textContent = n ? "比了 " + (n + 1) + " 道，最后留下它" : "";
+      pkPrimary.hidden = true;
+      pkSwap.hidden = true;
+      pkUndo.hidden = !P.champion || S.undone.indexOf(P.champion.name) > -1;
+      pkCopy.hidden = !P.champion;
+      pkCopy.textContent = "复制";
+    }
+
+    setChipsDisabled(P.busy);
+    setChipsFaded(P.state === "accepted");
+  }
+
+  /* 开局 / 重发：清空本场记录，发一对反差最大的牌 */
+  function pkDeal(){
+    P.beaten = [];
+    P.seen = [];
+    P.rounds = 0;
+    P.streak = 0;
+    P.busy = false;
+    setPstate("face");
+
+    var all = candidates().pool;
+    var fresh = remaining(all, false);
+    P.relaxed = fresh.length < 2;
+    P.basePool = P.relaxed ? all.slice() : fresh;
+
+    P.champion = P.basePool.length ? pick(P.basePool) : null;
+    if (!P.champion){
+      P.challenger = null;
+      duelEl.textContent = "";
+      pkCount.textContent = "今天没得选了";
+      pkPrimary.hidden = true;
+      pkSwap.hidden = true;
+      return;
+    }
+
+    P.seen.push(P.champion.name);
+    P.challenger = pkChallenger(P.champion);
+    if (P.challenger) P.seen.push(P.challenger.name);
+
+    renderDuel(true);
+    syncPkChrome();
+    setHint(P.relaxed && P.basePool.length < 2 ? "今天这几个方向都吃过了，就它吧" : "");
+    if (S.view === "pk") announceDuel();
+  }
+
+  function pkChoose(name){
+    if (P.state !== "face" || P.busy || !P.challenger) return;
+    if (name !== P.champion.name && name !== P.challenger.name) return;
+
+    var keepChampion = name === P.champion.name;
+    var loser = keepChampion ? P.challenger.name : P.champion.name;
+
+    P.busy = true;
+    P.rounds++;
+    playTick(true);
+    setHint("");
+
+    if (keepChampion){
+      P.streak++;
+    } else {
+      P.champion = P.challenger;
+      P.streak = 1;
+    }
+    P.beaten.push(loser);
+    P.challenger = pkChallenger(P.champion);
+    if (P.challenger) P.seen.push(P.challenger.name);
+
+    var loserEl = findDuelEl(loser);
+    if (loserEl) loserEl.classList.add("out");
+
+    setTimeout(function(){
+      renderDuel(true);
+      P.busy = false;
+      syncPkChrome();
+      announceDuel();
+      if (!P.challenger) setHint("今天的菜比得差不多了，就它吧");
+      else if (P.rounds === PK_HINT_ROUND) setHint("已经比了 6 道，要不要就它");
+    }, reduced ? 0 : 170);
+  }
+
+  /* 两个都不想吃：只换挑战者，擂主不动，也不记进淘汰 */
+  function pkSwapOut(){
+    if (P.state !== "face" || P.busy || !P.challenger) return;
+    if (!pkAvailable().length) {
+      setHint("今天的菜比得差不多了，就它吧");
+      return;
+    }
+
+    P.busy = true;
+    playTick(false);
+    setHint("");
+
+    var old = findDuelEl(P.challenger.name);
+    if (old) old.classList.add("out");
+
+    setTimeout(function(){
+      P.challenger = pkChallenger(P.champion);
+      if (P.challenger) P.seen.push(P.challenger.name);
+      renderDuel(true);
+      P.busy = false;
+      syncPkChrome();
+      announceDuel();
+      if (!P.challenger) setHint("今天的菜比得差不多了，就它吧");
+    }, reduced ? 0 : 120);
+  }
+
+  function pkAccept(){
+    if (P.state !== "face" || !P.champion || P.busy) return;
+
+    setPstate("accepted");
+    if (S.rolled.indexOf(P.champion.name) < 0){
+      S.rolled.push(P.champion.name);
+      write("jtsmc.rolled", S.rolled);
+    }
+
+    var el = findDuelEl(P.champion.name);
+    if (el) el.classList.add("winner");
+
+    syncPkChrome();
+    playSettle();
+    vibrate(12);
+    setTimeout(function(){ vibrate(20); }, 200);
+    liveEl.textContent = "就吃 " + P.champion.name;
+  }
+
+  function pkBack(){
+    if (P.state !== "accepted" || !P.champion) return;
+    if (S.undone.indexOf(P.champion.name) < 0){
+      S.undone.push(P.champion.name);
+      write("jtsmc.undone", S.undone);
+    }
+    setPstate("face");
+    renderDuel(false);
+    syncPkChrome();
+    setHint("");
+    announceDuel();
+  }
+
   function applyView(v, persist){
     S.view = v;
     if (persist) write("jtsmc.view", v);
 
-    var isSign = v === "sign";
-    viewSign.hidden = !isSign;
-    viewElim.hidden = isSign;
-    tabSign.setAttribute("aria-selected", String(isSign));
-    tabElim.setAttribute("aria-selected", String(!isSign));
+    viewSign.hidden = v !== "sign";
+    viewElim.hidden = v !== "elim";
+    viewPk.hidden   = v !== "pk";
+
+    tabSign.setAttribute("aria-selected", String(v === "sign"));
+    tabElim.setAttribute("aria-selected", String(v === "elim"));
+    tabPk.setAttribute("aria-selected", String(v === "pk"));
     setHint("");
 
-    if (isSign){
+    if (v === "sign"){
       setChipsFaded(S.state === "accepted" || S.state === "exhausted");
       setChipsDisabled(S.state === "rolling");
       /* 视图隐藏时 clientHeight 为 0，切回来必须重算字号 */
       if (S.dish && (S.state === "result" || S.state === "accepted")) sizeName(S.dish.name);
       if (S.state === "exhausted") sizeName("今日签已尽");
-    } else {
+    } else if (v === "elim"){
       setChipsFaded(E.state === "accepted");
       setChipsDisabled(E.state === "draw");
+    } else {
+      setChipsFaded(P.state === "accepted");
+      setChipsDisabled(P.busy);
     }
   }
 
@@ -1921,17 +2277,37 @@
     copyResult(elimCopy, E.winner && E.winner.name);
   });
 
-  /* ───────── 玩法切换 ───────── */
-  tabSign.addEventListener("click", function(){ applyView("sign", true); });
-  tabElim.addEventListener("click", function(){ applyView("elim", true); });
+  /* ───────── 玩法三的事件 ───────── */
+  duelEl.addEventListener("click", function(e){
+    var el = e.target.closest ? e.target.closest(".card") : null;
+    if (!el) return;
+    pkChoose(el.dataset.name);
+  });
 
-  [tabSign, tabElim].forEach(function(tab){
-    tab.addEventListener("keydown", function(e){
+  pkPrimary.addEventListener("click", pkAccept);
+  pkSwap.addEventListener("click", pkSwapOut);
+  pkUndo.addEventListener("click", pkBack);
+  pkCopy.addEventListener("click", function(){
+    copyResult(pkCopy, P.champion && P.champion.name);
+  });
+
+  /* ───────── 玩法切换 ───────── */
+  var TABS = [
+    { view: "sign", tab: tabSign },
+    { view: "elim", tab: tabElim },
+    { view: "pk",   tab: tabPk }
+  ];
+
+  TABS.forEach(function(item, idx){
+    item.tab.addEventListener("click", function(){ applyView(item.view, true); });
+
+    item.tab.addEventListener("keydown", function(e){
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
       e.preventDefault();
-      var v = S.view === "sign" ? "elim" : "sign";
-      applyView(v, true);
-      (v === "sign" ? tabSign : tabElim).focus();
+      var step = e.key === "ArrowRight" ? 1 : -1;
+      var next = TABS[(idx + step + TABS.length) % TABS.length];
+      applyView(next.view, true);
+      next.tab.focus();
     });
   });
 
@@ -1940,6 +2316,11 @@
     if (S.view === "elim"){
       if (E.state === "draw") return;
       elimReset();
+      return;
+    }
+    if (S.view === "pk"){
+      if (P.busy) return;
+      pkDeal();
       return;
     }
     if (S.state === "result" || S.state === "exhausted") toIdle();
@@ -1990,6 +2371,7 @@
   syncSound();
   toIdle();
   elimReset();
+  pkDeal();
   applyView(S.view, false);
 })();
 </script>
