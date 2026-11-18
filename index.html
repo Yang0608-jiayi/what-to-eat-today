@@ -20,6 +20,7 @@
     --line:rgba(43,38,34,.13);
     --seal:#A93A2C;
     --sign-h:clamp(238px,50vh,430px);
+    --card-h:clamp(84px,13vh,112px);
     --font:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
     --ease:cubic-bezier(.2,.75,.25,1);
   }
@@ -55,7 +56,7 @@
     min-height:100svh;
     display:grid;
     place-items:center;
-    padding:clamp(18px,4vh,44px) 20px;
+    padding:clamp(16px,3.4vh,40px) 20px calc(72px + env(safe-area-inset-bottom));
   }
 
   .page{
@@ -65,6 +66,15 @@
     flex-direction:column;
     align-items:center;
   }
+
+  /* 两个玩法视图，共用标题、chips 与提示 */
+  .view{
+    width:100%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+  .view[hidden]{display:none}
 
   h1{
     margin:0 0 clamp(16px,3.2vh,30px);
@@ -322,8 +332,7 @@
     margin-top:clamp(16px,3vh,26px);
     transition:opacity .3s var(--ease),visibility .3s;
   }
-  [data-state="accepted"] .chips,
-  [data-state="exhausted"] .chips{opacity:0;visibility:hidden;pointer-events:none}
+  .chips.faded{opacity:0;visibility:hidden;pointer-events:none}
 
   .chip{
     height:29px;
@@ -359,6 +368,190 @@
   }
   .hint.on{opacity:1}
 
+  /* ── 玩法二：排除法 ───────────────── */
+  .elim-lead{
+    margin:-8px 0 14px;
+    font-size:11.5px;
+    letter-spacing:.04em;
+    color:var(--muted);
+    text-align:center;
+  }
+
+  .cards{
+    width:100%;
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:10px;
+  }
+
+  .card{
+    position:relative;
+    height:var(--card-h);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    padding:8px 6px;
+    border:1px solid var(--line);
+    border-radius:5px;
+    background:linear-gradient(178deg,var(--paper-hi) 0%,#F8F2E6 100%);
+    box-shadow:0 10px 20px -20px rgba(43,38,34,.5);
+    font-family:inherit;
+    color:var(--ink);
+    cursor:pointer;
+    user-select:none;
+    -webkit-user-select:none;
+    -webkit-touch-callout:none;
+    touch-action:manipulation;
+    transition:opacity .22s var(--ease),transform .22s var(--ease),
+               border-color .22s,box-shadow .22s;
+  }
+  .card:hover{border-color:rgba(43,38,34,.3)}
+  .card:active{transform:translateY(1px)}
+  .card:focus-visible{outline:2px solid rgba(43,38,34,.45);outline-offset:2px}
+
+  .card-name{
+    font-size:clamp(15px,2.5vh,19px);
+    line-height:1.25;
+    letter-spacing:.06em;
+    text-align:center;
+    text-wrap:balance;
+  }
+  .card-tags{
+    display:flex;
+    gap:6px;
+    font-size:10.5px;
+    letter-spacing:.1em;
+    color:var(--muted);
+  }
+  .card-tags i{font-style:normal}
+
+  /* 排掉的那张：划掉、变淡，仍可点回来 */
+  .card.off{
+    opacity:.3;
+    border-style:dashed;
+    box-shadow:none;
+    background:none;
+  }
+  .card.off .card-name{text-decoration:line-through}
+  .card.off .card-tags{opacity:.7}
+  .card.off:hover{opacity:.5}
+
+  /* 抖一下：最后一张不能排 */
+  .card.deny{animation:deny .26s var(--ease)}
+  @keyframes deny{
+    0%,100%{transform:translateX(0)}
+    25%{transform:translateX(-3px)}
+    75%{transform:translateX(3px)}
+  }
+
+  /* 抽取时：没被选中的依次淡出 */
+  .card.out{
+    opacity:0;
+    transform:translateY(6px) scale(.97);
+    pointer-events:none;
+  }
+
+  .view-elim[data-state="result"] .cards,
+  .view-elim[data-state="accepted"] .cards{
+    display:flex;
+    justify-content:center;
+  }
+  .view-elim[data-state="result"] .card,
+  .view-elim[data-state="accepted"] .card{display:none}
+  .view-elim[data-state="result"] .card.winner,
+  .view-elim[data-state="accepted"] .card.winner{
+    display:flex;
+    width:min(100%,250px);
+    height:auto;
+    padding:26px 18px 24px;
+    gap:10px;
+    border-color:rgba(43,38,34,.22);
+    box-shadow:0 22px 40px -30px rgba(43,38,34,.55);
+  }
+  .view-elim[data-state="result"] .card.winner{animation:winIn .34s var(--ease)}
+  @keyframes winIn{
+    from{opacity:.5;transform:scale(.96)}
+    to{opacity:1;transform:scale(1)}
+  }
+
+  .card-desc{
+    display:none;
+    font-size:12.5px;
+    line-height:1.7;
+    color:var(--ink-soft);
+    text-align:center;
+    text-wrap:balance;
+  }
+  .card.winner .card-desc{display:block}
+
+  .card-stamp{
+    display:none;
+    position:absolute;
+    right:9px;
+    bottom:9px;
+    width:24px;
+    height:24px;
+    place-items:center;
+    font-size:12px;
+    color:var(--seal);
+    border:1.5px solid var(--seal);
+    border-radius:3px;
+    opacity:.88;
+    transform:rotate(-7deg);
+  }
+  .card.winner .card-stamp{
+    display:grid;
+    animation:cardStamp .26s var(--ease) .12s both;
+  }
+  @keyframes cardStamp{
+    from{opacity:0;transform:rotate(-7deg) scale(1.5)}
+    to{opacity:.88;transform:rotate(-7deg) scale(1)}
+  }
+
+  .count{
+    margin:12px 0 0;
+    min-height:1.5em;
+    font-size:11.5px;
+    letter-spacing:.06em;
+    color:var(--muted);
+    text-align:center;
+  }
+
+  /* ── 玩法切换 ─────────────────────── */
+  .switch{
+    position:fixed;
+    left:50%;
+    bottom:calc(12px + env(safe-area-inset-bottom));
+    transform:translateX(-50%);
+    z-index:3;
+    display:flex;
+    gap:2px;
+    padding:3px;
+    border:1px solid var(--line);
+    border-radius:999px;
+    background:rgba(246,241,231,.88);
+    -webkit-backdrop-filter:blur(8px);
+    backdrop-filter:blur(8px);
+    box-shadow:0 12px 26px -20px rgba(43,38,34,.6);
+  }
+  .switch button{
+    height:31px;
+    padding:0 17px;
+    border:0;
+    border-radius:999px;
+    background:none;
+    color:var(--muted);
+    font-family:inherit;
+    font-size:12.5px;
+    letter-spacing:.1em;
+    cursor:pointer;
+    transition:background .2s,color .2s;
+  }
+  .switch button[aria-selected="true"]{background:rgba(43,38,34,.075);color:var(--ink)}
+  .switch button:focus-visible{outline:2px solid rgba(43,38,34,.4);outline-offset:1px}
+
   /* ── 音效开关 ─────────────────────── */
   .sound{
     position:fixed;
@@ -391,19 +584,23 @@
 
   /* ── 窄屏 ─────────────────────────── */
   @media (max-width:520px){
-    :root{--sign-h:clamp(212px,44vh,320px)}
+    :root{--sign-h:clamp(212px,44vh,320px);--card-h:clamp(78px,12.2vh,96px)}
     h1{letter-spacing:.28em;text-indent:.28em;margin-bottom:14px}
     .action-slot{min-width:156px;height:44px}
     .btn{height:44px}
     .chips{gap:6px}
     .chip{padding:0 11px;font-size:12px}
+    .cards{grid-template-columns:repeat(2,1fr);gap:9px}
+    .switch button{padding:0 15px}
   }
 
   @media (max-height:640px){
-    :root{--sign-h:clamp(190px,42vh,260px)}
+    :root{--sign-h:clamp(190px,42vh,260px);--card-h:clamp(70px,11.2vh,86px)}
     h1{margin-bottom:12px}
     .action-slot{margin-top:14px}
     .chips{margin-top:14px}
+    .elim-lead{display:none}
+    .count{margin-top:9px}
   }
 
   @media (prefers-reduced-motion:reduce){
@@ -415,36 +612,61 @@
     .closing{transition:opacity .15s linear}
     .seal.stamped{animation:stampFlat .15s linear forwards}
     @keyframes stampFlat{from{opacity:0}to{opacity:.88;transform:none}}
+    .card{transition:opacity .15s linear}
+    .card.deny,.view-elim[data-state="result"] .card.winner,.card.winner .card-stamp{animation:none}
   }
 </style>
 </head>
 <body>
 
 <div class="stage">
-  <div class="page" id="page" data-state="idle">
+  <div class="page" id="page">
 
     <h1>今天吃什么</h1>
 
-    <div class="sign" id="sign">
-      <div class="ghosts" aria-hidden="true">
-        <span class="ghost"></span>
-        <span class="ghost"></span>
+    <div class="view view-sign" id="viewSign" data-state="idle" role="tabpanel" aria-labelledby="tabSign">
+
+      <div class="sign" id="sign">
+        <div class="ghosts" aria-hidden="true">
+          <span class="ghost"></span>
+          <span class="ghost"></span>
+        </div>
+        <div class="sign-body">
+          <div class="sign-name blank" id="signName">签</div>
+        </div>
+        <div class="sign-desc" id="signDesc"></div>
+        <div class="seal" id="seal">吃</div>
       </div>
-      <div class="sign-body">
-        <div class="sign-name blank" id="signName">签</div>
+
+      <div class="action-slot">
+        <button class="btn" id="primary" data-action="roll">摇一签</button>
+        <p class="closing" id="closing">就它了，去吃吧</p>
       </div>
-      <div class="sign-desc" id="signDesc"></div>
-      <div class="seal" id="seal">吃</div>
+
+      <div class="minor-actions">
+        <button class="link" id="secondary" hidden>再摇一签</button>
+        <button class="link" id="copyBtn" hidden>复制</button>
+      </div>
     </div>
 
-    <div class="action-slot">
-      <button class="btn" id="primary" data-action="roll">摇一签</button>
-      <p class="closing" id="closing">就它了，去吃吧</p>
-    </div>
+    <div class="view view-elim" id="viewElim" data-state="pick" role="tabpanel" aria-labelledby="tabElim" hidden>
 
-    <div class="minor-actions">
-      <button class="link" id="secondary" hidden>再摇一签</button>
-      <button class="link" id="copyBtn" hidden>复制</button>
+      <p class="elim-lead">点掉不想吃的，剩一个就是答案</p>
+
+      <div class="cards" id="cards"></div>
+
+      <p class="count" id="elimCount"></p>
+
+      <div class="action-slot">
+        <button class="btn" id="elimPrimary" data-action="draw">从这 6 个里抽一个</button>
+        <p class="closing" id="elimClosing">就它了，去吃吧</p>
+      </div>
+
+      <div class="minor-actions">
+        <button class="link" id="elimShuffle">换一组</button>
+        <button class="link" id="elimUndo" hidden>再想想</button>
+        <button class="link" id="elimCopy" hidden>复制</button>
+      </div>
     </div>
 
     <div class="chips" id="chips">
@@ -457,6 +679,11 @@
     <div class="sr-only" aria-live="polite" id="live"></div>
   </div>
 </div>
+
+<nav class="switch" role="tablist" aria-label="玩法切换">
+  <button role="tab" id="tabSign" aria-selected="true" aria-controls="viewSign">摇一签</button>
+  <button role="tab" id="tabElim" aria-selected="false" aria-controls="viewElim">排除法</button>
+</nav>
 
 <button class="sound" id="sound" aria-label="音效开关" aria-pressed="false" title="音效">
   <svg id="soundIcon" viewBox="0 0 24 24" aria-hidden="true">
@@ -662,7 +889,10 @@
   ];
 
   /* ───────── 元素 ───────── */
-  var page      = document.getElementById("page");
+  var viewSign  = document.getElementById("viewSign");
+  var viewElim  = document.getElementById("viewElim");
+  var tabSign   = document.getElementById("tabSign");
+  var tabElim   = document.getElementById("tabElim");
   var sign      = document.getElementById("sign");
   var nameEl    = document.getElementById("signName");
   var descEl    = document.getElementById("signDesc");
@@ -679,6 +909,14 @@
   var liveEl    = document.getElementById("live");
   var soundBtn  = document.getElementById("sound");
   var wavesEl   = document.getElementById("waves");
+
+  var cardsEl   = document.getElementById("cards");
+  var elimCount = document.getElementById("elimCount");
+  var elimPrimary = document.getElementById("elimPrimary");
+  var elimClosing = document.getElementById("elimClosing");
+  var elimShuffle = document.getElementById("elimShuffle");
+  var elimUndo    = document.getElementById("elimUndo");
+  var elimCopy    = document.getElementById("elimCopy");
 
   /* ───────── 存储 ───────── */
   function read(k, fallback){
@@ -698,6 +936,7 @@
   }
 
   var S = {
+    view: read("jtsmc.view", "sign") === "elim" ? "elim" : "sign",
     state: "idle",
     dish: null,
     gentle: false,
@@ -710,6 +949,14 @@
     rollCount: 0,
     outletUsed: false,
     relaxMsg: ""
+  };
+
+  /* 排除法自己的会话状态，不持久化 */
+  var E = {
+    state: "pick",
+    cards: [],
+    winner: null,
+    seen: []
   };
 
   /* 逻辑日期：凌晨 4 点翻篇 */
@@ -926,7 +1173,16 @@
   /* ───────── 渲染 ───────── */
   function setState(s){
     S.state = s;
-    page.setAttribute("data-state", s);
+    viewSign.setAttribute("data-state", s);
+  }
+
+  function setEstate(s){
+    E.state = s;
+    viewElim.setAttribute("data-state", s);
+  }
+
+  function setChipsFaded(v){
+    chips.classList.toggle("faded", !!v);
   }
 
   function setHint(text){
@@ -1000,6 +1256,7 @@
     resetCopy();
     setHint("");
     setChipsDisabled(false);
+    setChipsFaded(false);
     S.dish = null;
     S.relaxMsg = "";
   }
@@ -1020,6 +1277,7 @@
     resetCopy();
     setHint(msg);
     setChipsDisabled(false);
+    setChipsFaded(false);
     liveEl.textContent = "今天吃 " + d.name;
     maybeTip(msg);
   }
@@ -1036,6 +1294,7 @@
     copyBtn.hidden = false;
     copyBtn.textContent = "复制";
     setChipsDisabled(true);
+    setChipsFaded(true);
     liveEl.textContent = "就吃 " + S.dish.name;
     vibrate(20);
     playStamp();
@@ -1055,6 +1314,7 @@
     resetCopy();
     setHint("");
     setChipsDisabled(false);
+    setChipsFaded(true);
     liveEl.textContent = "今日签已尽";
   }
 
@@ -1152,7 +1412,359 @@
     secondary.dataset.action = "roll";
     resetCopy();
     setChipsDisabled(false);
+    setChipsFaded(false);
     liveEl.textContent = "今天吃 " + S.dish.name;
+  }
+
+  /* ───────── 玩法二：排除法 ───────── */
+  var CARD_COUNT = 6;
+  var FLAVORS = ["辣", "清淡", "重口"];
+  var KINDS = ["荤", "素"];
+  var drawing = false;
+
+  function findCardEl(name){
+    var kids = cardsEl.children;
+    for (var i = 0; i < kids.length; i++){
+      if (kids[i].dataset.name === name) return kids[i];
+    }
+    return null;
+  }
+
+  function aliveCards(){
+    return E.cards.filter(function(c){ return !c.off; });
+  }
+
+  function shuffle(list){
+    for (var i = list.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = list[i]; list[i] = list[j]; list[j] = t;
+    }
+    return list;
+  }
+
+  function cardTags(d){
+    var t = [flavorOf(d)];
+    if (d.tags.indexOf("面") > -1) t.push("面");
+    if (d.tags.indexOf("海鲜") > -1) t.push("海鲜");
+    return t;
+  }
+
+  /* 组内优先级：今天没摇过也没看过 → 没看过 → 都行 */
+  function pickFresh(list){
+    if (!list.length) return null;
+    var seen = E.seen, rolled = S.rolled;
+    var a = list.filter(function(d){
+      return seen.indexOf(d.name) < 0 && rolled.indexOf(d.name) < 0;
+    });
+    if (a.length) return pick(a);
+    var b = list.filter(function(d){ return seen.indexOf(d.name) < 0; });
+    if (b.length) return pick(b);
+    return pick(list);
+  }
+
+  /* 分层发牌：辣/清淡/重口 × 荤/素 各一张，海鲜保底，不够再补满 */
+  function dealCards(){
+    var pool = candidates().pool;
+    var used = {};
+    var out = [];
+
+    FLAVORS.forEach(function(f){
+      KINDS.forEach(function(k){
+        if (out.length >= CARD_COUNT) return;
+        var seg = pool.filter(function(d){
+          return !used[d.name] && flavorOf(d) === f && d.tags.indexOf(k) > -1;
+        });
+        var d = pickFresh(seg);
+        if (d){ used[d.name] = 1; out.push(d); }
+      });
+    });
+
+    /* 海鲜保底：替掉一张非海鲜的牌 */
+    var hasSea = out.some(function(d){ return d.tags.indexOf("海鲜") > -1; });
+    if (!hasSea){
+      var sea = pickFresh(pool.filter(function(d){
+        return !used[d.name] && d.tags.indexOf("海鲜") > -1;
+      }));
+      if (sea){
+        var idx = -1;
+        for (var i = 0; i < out.length; i++){
+          if (out[i].tags.indexOf("海鲜") < 0){ idx = i; break; }
+        }
+        if (idx > -1){
+          delete used[out[idx].name];
+          used[sea.name] = 1;
+          out[idx] = sea;
+        } else if (out.length < CARD_COUNT){
+          used[sea.name] = 1;
+          out.push(sea);
+        }
+      }
+    }
+
+    while (out.length < CARD_COUNT){
+      var rest = pool.filter(function(d){ return !used[d.name]; });
+      if (!rest.length) break;
+      var extra = pickFresh(rest);
+      used[extra.name] = 1;
+      out.push(extra);
+    }
+
+    return out;
+  }
+
+  function renderCards(){
+    cardsEl.textContent = "";
+    E.cards.forEach(function(item){
+      var d = item.d;
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "card" + (item.off ? " off" : "");
+      b.dataset.name = d.name;
+      b.setAttribute("aria-pressed", String(!!item.off));
+
+      var n = document.createElement("span");
+      n.className = "card-name";
+      n.textContent = d.name;
+
+      var tags = document.createElement("span");
+      tags.className = "card-tags";
+      cardTags(d).forEach(function(t){
+        var i = document.createElement("i");
+        i.textContent = t;
+        tags.appendChild(i);
+      });
+
+      var desc = document.createElement("span");
+      desc.className = "card-desc";
+      desc.textContent = d.desc;
+
+      var stamp = document.createElement("span");
+      stamp.className = "card-stamp";
+      stamp.setAttribute("aria-hidden", "true");
+      stamp.textContent = "吃";
+
+      b.appendChild(n);
+      b.appendChild(tags);
+      b.appendChild(desc);
+      b.appendChild(stamp);
+      cardsEl.appendChild(b);
+    });
+  }
+
+  function syncElimChrome(){
+    var alive = aliveCards().length;
+
+    if (E.state === "pick"){
+      elimCount.textContent = "还剩 " + alive + " 道";
+      elimPrimary.hidden = false;
+      elimPrimary.textContent = alive > 1 ? "从这 " + alive + " 个里抽一个" : "就吃这个";
+      elimPrimary.dataset.action = alive > 1 ? "draw" : "accept";
+      elimShuffle.hidden = false;
+      elimUndo.hidden = true;
+      elimCopy.hidden = true;
+    } else if (E.state === "result"){
+      elimCount.textContent = "就它了";
+      elimPrimary.hidden = false;
+      elimPrimary.textContent = "就吃这个";
+      elimPrimary.dataset.action = "accept";
+      elimShuffle.hidden = true;
+      elimUndo.hidden = false;
+      elimUndo.textContent = "再想想";
+      elimCopy.hidden = true;
+    } else if (E.state === "accepted"){
+      elimCount.textContent = "";
+      elimPrimary.hidden = true;
+      elimShuffle.hidden = true;
+      elimUndo.hidden = S.undone.indexOf(E.winner.name) > -1;
+      elimUndo.textContent = "再想想";
+      elimCopy.hidden = false;
+      elimCopy.textContent = "复制";
+    } else {
+      elimCount.textContent = "抽一个…";
+      elimPrimary.hidden = true;
+      elimShuffle.hidden = true;
+      elimUndo.hidden = true;
+      elimCopy.hidden = true;
+    }
+
+    setChipsDisabled(E.state === "draw");
+    setChipsFaded(E.state === "accepted");
+  }
+
+  /* 重新发牌：当前 6 张进「看过」集合，换一组不再撞车 */
+  function elimReset(){
+    E.cards.forEach(function(c){
+      if (E.seen.indexOf(c.d.name) < 0) E.seen.push(c.d.name);
+    });
+    if (E.seen.length > 24) E.seen = E.seen.slice(E.seen.length - 24);
+
+    E.winner = null;
+    var ds = dealCards();
+    if (!ds.length) ds = shuffle(DISHES.slice()).slice(0, CARD_COUNT);
+    E.cards = ds.map(function(d){ return { d: d, off: false }; });
+    setEstate("pick");
+    renderCards();
+    syncElimChrome();
+    setHint("");
+  }
+
+  function denyCard(name){
+    var el = findCardEl(name);
+    if (!el) return;
+    el.classList.remove("deny");
+    void el.offsetWidth;
+    el.classList.add("deny");
+    setTimeout(function(){ el.classList.remove("deny"); }, 300);
+  }
+
+  /* 定格：一张牌留下，其余消失 */
+  function elimPin(d){
+    if (!d) return;
+    if (E.state === "result" && E.winner && E.winner.name === d.name) return;
+
+    E.winner = d;
+    if (S.rolled.indexOf(d.name) < 0){
+      S.rolled.push(d.name);
+      write("jtsmc.rolled", S.rolled);
+    }
+
+    var kids = cardsEl.children;
+    for (var i = 0; i < kids.length; i++){
+      kids[i].classList.remove("out");
+      kids[i].classList.remove("winner");
+    }
+    var el = findCardEl(d.name);
+    if (el) el.classList.add("winner");
+
+    setEstate("result");
+    syncElimChrome();
+    playSettle();
+    vibrate(12);
+    liveEl.textContent = "今天吃 " + d.name;
+  }
+
+  function onCardClick(name){
+    if (E.state !== "pick") return;
+
+    var item = null;
+    for (var i = 0; i < E.cards.length; i++){
+      if (E.cards[i].d.name === name) item = E.cards[i];
+    }
+    if (!item) return;
+
+    /* 最后一张不能排除 */
+    if (!item.off && aliveCards().length <= 1){
+      denyCard(name);
+      setHint("总得留一个");
+      vibrate(12);
+      return;
+    }
+
+    item.off = !item.off;
+
+    var el = findCardEl(name);
+    if (el){
+      el.classList.toggle("off", item.off);
+      el.setAttribute("aria-pressed", String(item.off));
+    }
+
+    playTick(!item.off);
+    setHint("");
+
+    var alive = aliveCards();
+    if (alive.length === 1){
+      /* 排到只剩一张，直接定格 */
+      elimPin(alive[0].d);
+      return;
+    }
+    liveEl.textContent = "还剩 " + alive.length + " 道";
+    syncElimChrome();
+  }
+
+  function elimDraw(){
+    if (E.state !== "pick" || drawing) return;
+
+    var alive = aliveCards();
+    if (alive.length <= 1){
+      if (alive.length) elimPin(alive[0].d);
+      return;
+    }
+
+    drawing = true;
+    setEstate("draw");
+    syncElimChrome();
+    setHint("");
+
+    var winnerItem = alive[Math.floor(Math.random() * alive.length)];
+    var losers = alive.filter(function(c){ return c !== winnerItem; });
+    shuffle(losers);
+
+    var step = reduced ? 0 : 55;
+    losers.forEach(function(c, i){
+      setTimeout(function(){
+        var el = findCardEl(c.d.name);
+        if (el) el.classList.add("out");
+      }, step * i);
+    });
+
+    playShake(reduced ? 150 : 480);
+
+    setTimeout(function(){
+      drawing = false;
+      elimPin(winnerItem.d);
+    }, reduced ? 180 : step * losers.length + 240);
+  }
+
+  function elimAccept(){
+    if (E.state !== "result" || !E.winner) return;
+    setEstate("accepted");
+    syncElimChrome();
+    liveEl.textContent = "就吃 " + E.winner.name;
+    vibrate(20);
+  }
+
+  function elimBack(){
+    if (E.state === "result"){
+      /* 回到六张牌，保留排除状态；赢家自动回到未排除 */
+      E.winner = null;
+      setEstate("pick");
+      renderCards();
+      syncElimChrome();
+      setHint("");
+      return;
+    }
+    if (E.state === "accepted" && E.winner){
+      if (S.undone.indexOf(E.winner.name) < 0){
+        S.undone.push(E.winner.name);
+        write("jtsmc.undone", S.undone);
+      }
+      setEstate("result");
+      syncElimChrome();
+      liveEl.textContent = "今天吃 " + E.winner.name;
+    }
+  }
+
+  function applyView(v, persist){
+    S.view = v;
+    if (persist) write("jtsmc.view", v);
+
+    var isSign = v === "sign";
+    viewSign.hidden = !isSign;
+    viewElim.hidden = isSign;
+    tabSign.setAttribute("aria-selected", String(isSign));
+    tabElim.setAttribute("aria-selected", String(!isSign));
+    setHint("");
+
+    if (isSign){
+      setChipsFaded(S.state === "accepted" || S.state === "exhausted");
+      setChipsDisabled(S.state === "rolling");
+      /* 视图隐藏时 clientHeight 为 0，切回来必须重算字号 */
+      if (S.dish && (S.state === "result" || S.state === "accepted")) sizeName(S.dish.name);
+      if (S.state === "exhausted") sizeName("今日签已尽");
+    } else {
+      setChipsFaded(E.state === "accepted");
+      setChipsDisabled(E.state === "draw");
+    }
   }
 
   /* ───────── 复制 ───────── */
@@ -1173,14 +1785,14 @@
     }catch(e){ return false; }
   }
 
-  function copyResult(){
-    if (S.state !== "accepted" || !S.dish) return;
-    var text = "今天吃：" + S.dish.name;
+  function copyResult(btn, name){
+    if (!name) return;
+    var text = "今天吃：" + name;
     function done(ok){
-      copyBtn.textContent = ok ? "已复制" : "复制失败";
+      btn.textContent = ok ? "已复制" : "复制失败";
       liveEl.textContent = ok ? "已复制" : "复制失败";
       setTimeout(function(){
-        if (S.state === "accepted") copyBtn.textContent = "复制";
+        if (!btn.hidden) btn.textContent = "复制";
       }, 1200);
     }
     if (navigator.clipboard && navigator.clipboard.writeText){
@@ -1275,10 +1887,61 @@
     else roll(false);
   });
 
-  copyBtn.addEventListener("click", copyResult);
+  copyBtn.addEventListener("click", function(){
+    copyResult(copyBtn, S.dish && S.dish.name);
+  });
+
+  /* ───────── 玩法二的事件 ───────── */
+  cardsEl.addEventListener("click", function(e){
+    var el = e.target.closest ? e.target.closest(".card") : null;
+    if (!el) return;
+    onCardClick(el.dataset.name);
+  });
+
+  elimPrimary.addEventListener("click", function(){
+    var a = elimPrimary.dataset.action;
+    if (a === "draw") elimDraw();
+    else if (E.state === "result") elimAccept();
+    else if (E.state === "pick"){
+      var alive = aliveCards();
+      if (alive.length === 1) elimPin(alive[0].d);
+    }
+  });
+
+  elimShuffle.addEventListener("click", function(){
+    if (E.state !== "pick") return;
+    playTick(false);
+    elimReset();
+    liveEl.textContent = "换了一组";
+  });
+
+  elimUndo.addEventListener("click", elimBack);
+
+  elimCopy.addEventListener("click", function(){
+    copyResult(elimCopy, E.winner && E.winner.name);
+  });
+
+  /* ───────── 玩法切换 ───────── */
+  tabSign.addEventListener("click", function(){ applyView("sign", true); });
+  tabElim.addEventListener("click", function(){ applyView("elim", true); });
+
+  [tabSign, tabElim].forEach(function(tab){
+    tab.addEventListener("keydown", function(e){
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      var v = S.view === "sign" ? "elim" : "sign";
+      applyView(v, true);
+      (v === "sign" ? tabSign : tabElim).focus();
+    });
+  });
 
   /* 结果 / 签尽状态下改条件：作废当前画面，回到待摇，不自动重摇 */
   function afterChipChange(){
+    if (S.view === "elim"){
+      if (E.state === "draw") return;
+      elimReset();
+      return;
+    }
     if (S.state === "result" || S.state === "exhausted") toIdle();
   }
 
@@ -1317,6 +1980,7 @@
 
   /* ───────── 启动 ───────── */
   window.addEventListener("resize", function(){
+    if (viewSign.hidden) return;
     if (S.dish && (S.state === "result" || S.state === "accepted")) sizeName(S.dish.name);
     if (S.state === "exhausted") sizeName("今日签已尽");
   });
@@ -1325,6 +1989,8 @@
   syncChips();
   syncSound();
   toIdle();
+  elimReset();
+  applyView(S.view, false);
 })();
 </script>
 </body>
