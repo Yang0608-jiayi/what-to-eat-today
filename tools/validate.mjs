@@ -105,6 +105,12 @@ for (const [i, d] of dishes.entries()) {
     fail(at + "：三个标签必须是「荤/素 + 面或海鲜 + 味道」，当前多了一个无效组合");
   }
 
+  for (const flag of ["soup", "staple"]) {
+    if (flag in d && d[flag] !== 1) fail(at + "：" + flag + " 只能写 1");
+  }
+  if (d.soup === 1 && d.staple === 1) fail(at + "：soup 与 staple 不能同时标（汤是配菜，主食是自带饭）");
+  if (d.soup === 1 && d.tags.includes("面")) fail(at + "：面类不该进汤池");
+
   const sig = [...d.tags].sort().join("|");
   if (seenTagSet.has(sig)) seenTagSet.get(sig).push(d.name);
   else seenTagSet.set(sig, [d.name]);
@@ -183,6 +189,19 @@ for (const [tag, min] of floors) {
 }
 if (dist.辣 > 60) fail("辣 " + dist.辣 + " 道，超过上限 60");
 
+/* ── 一餐：汤池 / 自带主食 / 配菜 ───────── */
+const soups = dishes.filter((d) => d.soup === 1);
+const staples = dishes.filter((d) => d.staple === 1);
+const sides = dishes.filter((d) => d.soup !== 1 && d.staple !== 1);
+
+if (soups.length < 12) fail("汤池只有 " + soups.length + " 道，低于下限 12");
+if (staples.length < 40) fail("自带主食只有 " + staples.length + " 道，低于下限 40");
+if (sides.length < 100) fail("可当配菜的只有 " + sides.length + " 道，低于下限 100，加菜会很快无解");
+
+/* 「不吃辣 + 清淡点」下汤池必须还有得选 */
+const gentleSoups = soups.filter((d) => !d.tags.includes("辣") && d.tags.includes("清淡"));
+if (gentleSoups.length < 4) fail("清淡汤池只有 " + gentleSoups.length + " 道，低于下限 4");
+
 /* ── 输出 ───────────────────────────── */
 console.log("菜库总数：" + dishes.length + " 道\n");
 
@@ -197,6 +216,10 @@ for (const c of combos) {
   console.log("  " + c.label + "  →  " + String(c.count).padStart(3) + " 道" + (c.relaxed ? "  ⚠ 让步：" + c.relaxed : ""));
 }
 console.log("  最少的一组：" + Math.min(...combos.map((c) => c.count)) + " 道");
+
+console.log("\n一餐：");
+console.log("  汤池 " + soups.length + " 道（清淡 " + gentleSoups.length + " 道）");
+console.log("  自带主食 " + staples.length + " 道，可当配菜 " + sides.length + " 道");
 
 if (warnings.length) {
   console.log("\n提醒（不阻断）：");

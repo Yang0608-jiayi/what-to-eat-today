@@ -346,6 +346,30 @@
   .link:hover{color:var(--ink-soft);border-bottom-color:var(--line)}
   .link[hidden]{display:none}
 
+  /* ── 一餐组合（确认后才出现） ───────── */
+  /* 确认态下 .hint 已经清空却仍占着 31px，正好换成这一行 */
+  .meal{
+    display:flex;
+    align-items:baseline;
+    justify-content:center;
+    flex-wrap:wrap;
+    gap:2px 10px;
+    max-width:100%;
+    margin-top:10px;
+  }
+  .meal[hidden]{display:none}
+  .meal-list{
+    margin:0;
+    font-size:11.5px;
+    letter-spacing:.02em;
+    color:var(--ink-soft);
+    text-align:center;
+  }
+  .meal-acts{display:flex;align-items:baseline;gap:2px}
+  .meal .link{padding:4px 8px;font-size:11.5px;color:var(--teal-deep)}
+  .meal .link:hover{color:var(--teal-deep);border-bottom-color:rgba(44,99,96,.35)}
+  .page.meal-on .hint{display:none}
+
   /* ── chips ────────────────────────── */
   .chips{
     display:flex;
@@ -768,6 +792,15 @@
         <p class="closing" id="closing">就它了，去吃吧</p>
       </div>
 
+      <!-- 一餐：只在“定下来”之后出现，主食由菜推导、汤默认不带 -->
+      <div class="meal" hidden>
+        <p class="meal-list"></p>
+        <span class="meal-acts">
+          <button class="link meal-soup">配个汤</button>
+          <button class="link meal-add">加道菜</button>
+        </span>
+      </div>
+
       <div class="minor-actions">
         <button class="link" id="secondary" hidden>再摇一签</button>
         <button class="link" id="copyBtn" hidden>复制</button>
@@ -785,6 +818,14 @@
       <div class="action-slot">
         <button class="btn" id="elimPrimary" data-action="draw">从这 6 个里抽一个</button>
         <p class="closing" id="elimClosing">就它了，去吃吧</p>
+      </div>
+
+      <div class="meal" hidden>
+        <p class="meal-list"></p>
+        <span class="meal-acts">
+          <button class="link meal-soup">配个汤</button>
+          <button class="link meal-add">加道菜</button>
+        </span>
       </div>
 
       <div class="minor-actions">
@@ -805,6 +846,14 @@
       <div class="action-slot">
         <button class="btn" id="pkPrimary">就吃它</button>
         <p class="closing" id="pkClosing">就它了，去吃吧</p>
+      </div>
+
+      <div class="meal" hidden>
+        <p class="meal-list"></p>
+        <span class="meal-acts">
+          <button class="link meal-soup">配个汤</button>
+          <button class="link meal-add">加道菜</button>
+        </span>
       </div>
 
       <div class="minor-actions">
@@ -833,8 +882,8 @@
   var DISHES = [
     {name:"白切鸡",desc:"蘸点姜葱就够体面",tags:["荤","清淡"]},
     {name:"香菇滑鸡",desc:"菌菇把鲜味撑得很足",tags:["荤","清淡"]},
-    {name:"冬瓜排骨汤",desc:"想喝汤的时候就是它",tags:["荤","清淡"]},
-    {name:"玉米排骨汤",desc:"清甜，不用费心调味",tags:["荤","清淡"]},
+    {name:"冬瓜排骨汤",desc:"想喝汤的时候就是它",tags:["荤","清淡"],soup:1},
+    {name:"玉米排骨汤",desc:"清甜，不用费心调味",tags:["荤","清淡"],soup:1},
     {name:"蒜蓉蒸排骨",desc:"上锅一蒸，等着就行",tags:["荤","清淡"]},
     {name:"番茄牛腩",desc:"炖得越久越像家里做的",tags:["荤","清淡"]},
     {name:"土豆炖牛肉",desc:"一锅端，饱得很实在",tags:["荤","清淡"]},
@@ -842,15 +891,15 @@
     {name:"萝卜牛腩煲",desc:"冬天里最不会后悔的选择",tags:["荤","清淡"]},
     {name:"木须肉",desc:"肉蛋木耳一盘，营养够了",tags:["荤","清淡"]},
     {name:"番茄炒蛋",desc:"十分钟搞定，永远的安全牌",tags:["素","清淡"]},
-    {name:"清蒸蛋羹",desc:"没胃口的晚上也不会出错",tags:["素","清淡"]},
+    {name:"清蒸蛋羹",desc:"没胃口的晚上也不会出错",tags:["素","清淡"],soup:1},
     {name:"蒜蓉油麦菜",desc:"三分钟出锅，清爽不占胃",tags:["素","清淡"]},
     {name:"上汤娃娃菜",desc:"清淡里带一点鲜，很舒服",tags:["素","清淡"]},
     {name:"香菇青菜",desc:"看着朴素，吃着顺口",tags:["素","清淡"]},
     {name:"凉拌黄瓜",desc:"热天里最不用犹豫的一道",tags:["素","清淡"]},
     {name:"清炒时蔬",desc:"今天想吃点绿的，就它",tags:["素","清淡"]},
-    {name:"番茄豆腐汤",desc:"酸甜开胃，配什么都行",tags:["素","清淡"]},
+    {name:"番茄豆腐汤",desc:"酸甜开胃，配什么都行",tags:["素","清淡"],soup:1},
     {name:"家常豆腐",desc:"煎得焦香，下饭不费劲",tags:["素","清淡"]},
-    {name:"紫菜蛋花汤",desc:"十分钟的汤，也够暖",tags:["素","清淡"]},
+    {name:"紫菜蛋花汤",desc:"十分钟的汤，也够暖",tags:["素","清淡"],soup:1},
     {name:"麻婆豆腐",desc:"一个人吃也不会寂寞",tags:["荤","辣"]},
     {name:"宫保鸡丁",desc:"酸甜带辣，米饭杀手",tags:["荤","辣"]},
     {name:"回锅肉",desc:"香得直接，适合饿狠了",tags:["荤","辣"]},
@@ -883,31 +932,31 @@
     {name:"干烧带鱼",desc:"咸香带辣，很家常的硬菜",tags:["荤","海鲜","辣"]},
     {name:"水煮鱼",desc:"辣得痛快，适合人多时吃",tags:["荤","海鲜","辣"]},
     {name:"小龙虾",desc:"剥壳喝酒，是一种仪式",tags:["荤","海鲜","辣"]},
-    {name:"兰州牛肉面",desc:"一碗下去，胃立刻有落",tags:["荤","面","清淡"]},
-    {name:"牛肉粉丝汤",desc:"汤热面滑，冬天首选",tags:["荤","面","清淡"]},
-    {name:"过桥米线",desc:"先喝汤，再慢慢烫料",tags:["荤","面","清淡"]},
-    {name:"冷面",desc:"冰凉的汤，第一口就醒了",tags:["荤","面","清淡"]},
-    {name:"炸酱面",desc:"拌开的那一下最香",tags:["荤","面","重口"]},
-    {name:"刀削面",desc:"面片厚实，嚼着有存在感",tags:["荤","面","重口"]},
-    {name:"牛肉拌面",desc:"拌匀了再吃，越吃越香",tags:["荤","面","重口"]},
-    {name:"豆角焖面",desc:"一锅出，连菜带主食",tags:["荤","面","重口"]},
-    {name:"阳春面",desc:"一碗清汤，什么都不用选",tags:["素","面","清淡"]},
-    {name:"西红柿鸡蛋面",desc:"家里常备的安心组合",tags:["素","面","清淡"]},
-    {name:"麻酱凉面",desc:"热天里最省事的一顿",tags:["素","面","清淡"]},
-    {name:"热干面",desc:"芝麻酱裹住每一根",tags:["素","面","重口"]},
-    {name:"葱油拌面",desc:"简单到不像菜，但很香",tags:["素","面","重口"]},
-    {name:"重庆小面",desc:"辣得清醒，适合犹豫的一天",tags:["素","面","辣"]},
-    {name:"油泼面",desc:"热油一泼，声音先馋人",tags:["素","面","辣"]},
-    {name:"螺蛳粉",desc:"闻着犹豫，吃完想念",tags:["素","面","辣"]},
-    {name:"酸辣粉",desc:"酸辣冲上来，人会醒一半",tags:["素","面","辣"]},
-    {name:"担担面",desc:"麻香在嘴里慢慢铺开",tags:["荤","面","辣"]},
-    {name:"蛋炒饭",desc:"一个人吃饭的体面方案",tags:["素","清淡"]},
-    {name:"咖喱鸡饭",desc:"浓稠的咖喱浇在饭上",tags:["荤","重口"]},
-    {name:"卤肉饭",desc:"一勺卤汁解决一碗饭",tags:["荤","重口"]},
-    {name:"黄焖鸡米饭",desc:"汤汁拌饭，比鸡还香",tags:["荤","重口"]},
-    {name:"猪脚饭",desc:"吃完很有力气的一顿",tags:["荤","重口"]},
-    {name:"煲仔饭",desc:"等锅巴形成的那几分钟很值",tags:["荤","重口"]},
-    {name:"石锅拌饭",desc:"拌开时锅底还在响",tags:["素","辣"]},
+    {name:"兰州牛肉面",desc:"一碗下去，胃立刻有落",tags:["荤","面","清淡"],staple:1},
+    {name:"牛肉粉丝汤",desc:"汤热面滑，冬天首选",tags:["荤","面","清淡"],staple:1},
+    {name:"过桥米线",desc:"先喝汤，再慢慢烫料",tags:["荤","面","清淡"],staple:1},
+    {name:"冷面",desc:"冰凉的汤，第一口就醒了",tags:["荤","面","清淡"],staple:1},
+    {name:"炸酱面",desc:"拌开的那一下最香",tags:["荤","面","重口"],staple:1},
+    {name:"刀削面",desc:"面片厚实，嚼着有存在感",tags:["荤","面","重口"],staple:1},
+    {name:"牛肉拌面",desc:"拌匀了再吃，越吃越香",tags:["荤","面","重口"],staple:1},
+    {name:"豆角焖面",desc:"一锅出，连菜带主食",tags:["荤","面","重口"],staple:1},
+    {name:"阳春面",desc:"一碗清汤，什么都不用选",tags:["素","面","清淡"],staple:1},
+    {name:"西红柿鸡蛋面",desc:"家里常备的安心组合",tags:["素","面","清淡"],staple:1},
+    {name:"麻酱凉面",desc:"热天里最省事的一顿",tags:["素","面","清淡"],staple:1},
+    {name:"热干面",desc:"芝麻酱裹住每一根",tags:["素","面","重口"],staple:1},
+    {name:"葱油拌面",desc:"简单到不像菜，但很香",tags:["素","面","重口"],staple:1},
+    {name:"重庆小面",desc:"辣得清醒，适合犹豫的一天",tags:["素","面","辣"],staple:1},
+    {name:"油泼面",desc:"热油一泼，声音先馋人",tags:["素","面","辣"],staple:1},
+    {name:"螺蛳粉",desc:"闻着犹豫，吃完想念",tags:["素","面","辣"],staple:1},
+    {name:"酸辣粉",desc:"酸辣冲上来，人会醒一半",tags:["素","面","辣"],staple:1},
+    {name:"担担面",desc:"麻香在嘴里慢慢铺开",tags:["荤","面","辣"],staple:1},
+    {name:"蛋炒饭",desc:"一个人吃饭的体面方案",tags:["素","清淡"],staple:1},
+    {name:"咖喱鸡饭",desc:"浓稠的咖喱浇在饭上",tags:["荤","重口"],staple:1},
+    {name:"卤肉饭",desc:"一勺卤汁解决一碗饭",tags:["荤","重口"],staple:1},
+    {name:"黄焖鸡米饭",desc:"汤汁拌饭，比鸡还香",tags:["荤","重口"],staple:1},
+    {name:"猪脚饭",desc:"吃完很有力气的一顿",tags:["荤","重口"],staple:1},
+    {name:"煲仔饭",desc:"等锅巴形成的那几分钟很值",tags:["荤","重口"],staple:1},
+    {name:"石锅拌饭",desc:"拌开时锅底还在响",tags:["素","辣"],staple:1},
     {name:"红烧肉",desc:"馋了就该吃，别忍着",tags:["荤","重口"]},
     {name:"糖醋排骨",desc:"酸甜的，心情差时特别管用",tags:["荤","重口"]},
     {name:"京酱肉丝",desc:"拿生菜卷着吃，很有仪式感",tags:["荤","重口"]},
@@ -932,47 +981,47 @@
     {name:"皮蛋豆腐",desc:"冷盘里的安全牌，配粥也好",tags:["素","清淡"]},
     {name:"拌菠菜",desc:"焯一下拌开，涩味全没了",tags:["素","清淡"]},
     /* ── 第二版扩充：点心 / 早餐 ── */
-    {name:"韭菜鸡蛋饺子",desc:"素馅的，吃完不犯困",tags:["素","清淡"]},
-    {name:"猪肉白菜饺子",desc:"一盘管饱，蘸醋更香",tags:["荤","清淡"]},
-    {name:"荠菜馄饨",desc:"汤清馅鲜，胃里舒服",tags:["素","清淡"]},
-    {name:"小笼包",desc:"先咬个小口，别烫着",tags:["荤","清淡"]},
-    {name:"皮蛋瘦肉粥",desc:"熬得稠，一碗就够",tags:["荤","清淡"]},
-    {name:"小米粥",desc:"胃不舒服时最想喝它",tags:["素","清淡"]},
-    {name:"白粥咸菜",desc:"简单到不用解释的一顿",tags:["素","清淡"]},
-    {name:"生煎包",desc:"底脆汁多，小心烫嘴",tags:["荤","重口"]},
-    {name:"锅贴",desc:"贴着锅的那面最香",tags:["荤","重口"]},
-    {name:"煎饼果子",desc:"加了薄脆，走路也能吃",tags:["素","重口"]},
-    {name:"豆浆油条",desc:"老搭配，从来不会错",tags:["素","清淡"]},
-    {name:"葱油饼",desc:"层层起酥，趁热最好",tags:["素","重口"]},
-    {name:"烧麦",desc:"糯米裹着肉，很顶饱",tags:["荤","重口"]},
-    {name:"鸡蛋肠粉",desc:"滑溜溜的，几口就没了",tags:["素","清淡"]},
+    {name:"韭菜鸡蛋饺子",desc:"素馅的，吃完不犯困",tags:["素","清淡"],staple:1},
+    {name:"猪肉白菜饺子",desc:"一盘管饱，蘸醋更香",tags:["荤","清淡"],staple:1},
+    {name:"荠菜馄饨",desc:"汤清馅鲜，胃里舒服",tags:["素","清淡"],staple:1},
+    {name:"小笼包",desc:"先咬个小口，别烫着",tags:["荤","清淡"],staple:1},
+    {name:"皮蛋瘦肉粥",desc:"熬得稠，一碗就够",tags:["荤","清淡"],staple:1},
+    {name:"小米粥",desc:"胃不舒服时最想喝它",tags:["素","清淡"],staple:1},
+    {name:"白粥咸菜",desc:"简单到不用解释的一顿",tags:["素","清淡"],staple:1},
+    {name:"生煎包",desc:"底脆汁多，小心烫嘴",tags:["荤","重口"],staple:1},
+    {name:"锅贴",desc:"贴着锅的那面最香",tags:["荤","重口"],staple:1},
+    {name:"煎饼果子",desc:"加了薄脆，走路也能吃",tags:["素","重口"],staple:1},
+    {name:"豆浆油条",desc:"老搭配，从来不会错",tags:["素","清淡"],staple:1},
+    {name:"葱油饼",desc:"层层起酥，趁热最好",tags:["素","重口"],staple:1},
+    {name:"烧麦",desc:"糯米裹着肉，很顶饱",tags:["荤","重口"],staple:1},
+    {name:"鸡蛋肠粉",desc:"滑溜溜的，几口就没了",tags:["素","清淡"],staple:1},
     /* ── 第二版扩充：汤 ── */
-    {name:"番茄鸡蛋汤",desc:"酸甜的，先喝两口再说",tags:["素","清淡"]},
-    {name:"冬瓜丸子汤",desc:"汤清丸子弹，夏天合适",tags:["荤","清淡"]},
-    {name:"萝卜排骨汤",desc:"炖到萝卜透明就好了",tags:["荤","清淡"]},
-    {name:"莲藕排骨汤",desc:"藕粉糯，汤带一点甜",tags:["荤","清淡"]},
-    {name:"老鸭汤",desc:"慢炖出来的，越喝越暖",tags:["荤","清淡"]},
-    {name:"冬瓜薏米汤",desc:"去湿气，喝着很轻",tags:["素","清淡"]},
-    {name:"菌菇鸡汤",desc:"菌子把汤吊得很鲜",tags:["荤","清淡"]},
-    {name:"酸辣汤",desc:"胡椒够重，喝完冒汗",tags:["素","辣"]},
-    {name:"胡辣汤",desc:"早上来一碗，人就醒了",tags:["荤","辣"]},
-    {name:"海带豆腐汤",desc:"清清淡淡，配饭刚好",tags:["素","清淡"]},
-    {name:"白菜豆腐汤",desc:"最家常的一碗热汤",tags:["素","清淡"]},
-    {name:"丝瓜蛋汤",desc:"清甜，夏天喝着舒服",tags:["素","清淡"]},
-    {name:"罗宋汤",desc:"番茄和牛肉，酸得开胃",tags:["荤","清淡"]},
+    {name:"番茄鸡蛋汤",desc:"酸甜的，先喝两口再说",tags:["素","清淡"],soup:1},
+    {name:"冬瓜丸子汤",desc:"汤清丸子弹，夏天合适",tags:["荤","清淡"],soup:1},
+    {name:"萝卜排骨汤",desc:"炖到萝卜透明就好了",tags:["荤","清淡"],soup:1},
+    {name:"莲藕排骨汤",desc:"藕粉糯，汤带一点甜",tags:["荤","清淡"],soup:1},
+    {name:"老鸭汤",desc:"慢炖出来的，越喝越暖",tags:["荤","清淡"],soup:1},
+    {name:"冬瓜薏米汤",desc:"去湿气，喝着很轻",tags:["素","清淡"],soup:1},
+    {name:"菌菇鸡汤",desc:"菌子把汤吊得很鲜",tags:["荤","清淡"],soup:1},
+    {name:"酸辣汤",desc:"胡椒够重，喝完冒汗",tags:["素","辣"],soup:1},
+    {name:"胡辣汤",desc:"早上来一碗，人就醒了",tags:["荤","辣"],soup:1},
+    {name:"海带豆腐汤",desc:"清清淡淡，配饭刚好",tags:["素","清淡"],soup:1},
+    {name:"白菜豆腐汤",desc:"最家常的一碗热汤",tags:["素","清淡"],soup:1},
+    {name:"丝瓜蛋汤",desc:"清甜，夏天喝着舒服",tags:["素","清淡"],soup:1},
+    {name:"罗宋汤",desc:"番茄和牛肉，酸得开胃",tags:["荤","清淡"],soup:1},
     /* ── 第二版扩充：面 / 粉 ── */
-    {name:"云吞面",desc:"汤底清，云吞皮薄",tags:["荤","面","清淡"]},
-    {name:"雪菜肉丝面",desc:"咸鲜口，汤都能喝完",tags:["荤","面","清淡"]},
-    {name:"猪肝面",desc:"肝嫩汤浓，补得很实在",tags:["荤","面","清淡"]},
-    {name:"排骨面",desc:"排骨炖得脱骨，面也入味",tags:["荤","面","清淡"]},
-    {name:"肥肠面",desc:"处理得干净，越吃越香",tags:["荤","面","重口"]},
-    {name:"新疆炒米粉",desc:"酱汁裹满，辣得过瘾",tags:["荤","面","辣"]},
-    {name:"干炒牛河",desc:"锅气足，牛肉还嫩",tags:["荤","面","重口"]},
-    {name:"臊子面",desc:"酸香一口，汤要喝光",tags:["荤","面","辣"]},
-    {name:"大盘鸡拌面",desc:"鸡肉和面，一盘全解决",tags:["荤","面","重口"]},
-    {name:"凉皮",desc:"酸辣爽口，夏天常点",tags:["素","面","辣"]},
-    {name:"小锅米线",desc:"酸辣烫嘴，越吃越热",tags:["素","面","辣"]},
-    {name:"菌汤面",desc:"汤鲜面滑，不油不腻",tags:["素","面","清淡"]},
+    {name:"云吞面",desc:"汤底清，云吞皮薄",tags:["荤","面","清淡"],staple:1},
+    {name:"雪菜肉丝面",desc:"咸鲜口，汤都能喝完",tags:["荤","面","清淡"],staple:1},
+    {name:"猪肝面",desc:"肝嫩汤浓，补得很实在",tags:["荤","面","清淡"],staple:1},
+    {name:"排骨面",desc:"排骨炖得脱骨，面也入味",tags:["荤","面","清淡"],staple:1},
+    {name:"肥肠面",desc:"处理得干净，越吃越香",tags:["荤","面","重口"],staple:1},
+    {name:"新疆炒米粉",desc:"酱汁裹满，辣得过瘾",tags:["荤","面","辣"],staple:1},
+    {name:"干炒牛河",desc:"锅气足，牛肉还嫩",tags:["荤","面","重口"],staple:1},
+    {name:"臊子面",desc:"酸香一口，汤要喝光",tags:["荤","面","辣"],staple:1},
+    {name:"大盘鸡拌面",desc:"鸡肉和面，一盘全解决",tags:["荤","面","重口"],staple:1},
+    {name:"凉皮",desc:"酸辣爽口，夏天常点",tags:["素","面","辣"],staple:1},
+    {name:"小锅米线",desc:"酸辣烫嘴，越吃越热",tags:["素","面","辣"],staple:1},
+    {name:"菌汤面",desc:"汤鲜面滑，不油不腻",tags:["素","面","清淡"],staple:1},
     /* ── 第二版扩充：素家常 ── */
     {name:"干煸杏鲍菇",desc:"煸到微焦，比肉还香",tags:["素","辣"]},
     {name:"香菇烧豆腐",desc:"汤汁收得刚好，下饭",tags:["素","清淡"]},
@@ -1042,6 +1091,8 @@
   var chipNoodle  = document.getElementById("chipNoodle");
   var hintEl    = document.getElementById("hint");
   var liveEl    = document.getElementById("live");
+  var pageEl    = document.getElementById("page");
+  var mealBlocks = [].slice.call(document.querySelectorAll(".meal"));
   var soundBtn  = document.getElementById("sound");
   var wavesEl   = document.getElementById("waves");
 
@@ -1116,6 +1167,11 @@
     final: false,
     busy: false
   };
+
+  /* 一餐组合：只在“定下来”之后才有内容，不持久化 */
+  /* 主菜自带主食（面/粉/饺/饭/粥/包…）就不再配米饭 */
+  var MEAL_MAX_DISHES = 3;
+  var MEAL = { base: null, soup: null, sides: [] };
 
   /* 逻辑日期：凌晨 4 点翻篇 */
   function logicalDay(){
@@ -1332,16 +1388,19 @@
   function setState(s){
     S.state = s;
     viewSign.setAttribute("data-state", s);
+    syncMeal();
   }
 
   function setEstate(s){
     E.state = s;
     viewElim.setAttribute("data-state", s);
+    syncMeal();
   }
 
   function setPstate(s){
     P.state = s;
     viewPk.setAttribute("data-state", s);
+    syncMeal();
   }
 
   function setChipsFaded(v){
@@ -1351,6 +1410,135 @@
   function setHint(text){
     hintEl.textContent = text || "";
     hintEl.classList.toggle("on", !!text);
+  }
+
+  /* ───────── 一餐：主食推导 / 汤 / 加菜 ───────── */
+  function mealAccepted(){
+    if (S.view === "elim") return E.state === "accepted";
+    if (S.view === "pk")   return P.state === "accepted";
+    return S.state === "accepted";
+  }
+
+  function baseIsStaple(){ return !!(MEAL.base && MEAL.base.staple === 1); }
+  function baseIsSoup(){ return !!(MEAL.base && MEAL.base.soup === 1); }
+
+  function mealNames(){
+    var list = [];
+    if (MEAL.base) list.push(MEAL.base.name);
+    MEAL.sides.forEach(function(d){ list.push(d.name); });
+    if (MEAL.soup) list.push(MEAL.soup.name);
+    return list;
+  }
+
+  function mealParts(){
+    if (!MEAL.base) return [];
+    var parts = [MEAL.base.name];
+    MEAL.sides.forEach(function(d){ parts.push(d.name); });
+    /* 只有自带主食的才不配饭（面/饺/饭/粥/包…），汤也要配 */
+    if (!baseIsStaple()) parts.push("米饭");
+    if (MEAL.soup) parts.push(MEAL.soup.name);
+    return parts;
+  }
+
+  function menuText(){ return mealParts().join(" + "); }
+
+  /* 先守 chip 条件，再避开已有，最后避开今日摇过的 */
+  function mealFilter(pool){
+    var p = pool.filter(function(d){
+      var t = d.tags;
+      if (S.noSpicy && t.indexOf("辣") > -1) return false;
+      if (S.gentle && t.indexOf("清淡") < 0) return false;
+      return true;
+    });
+    if (!p.length){
+      p = pool.filter(function(d){
+        return !(S.noSpicy && d.tags.indexOf("辣") > -1);
+      });
+    }
+    if (!p.length) p = pool.slice();
+
+    var used = mealNames();
+    var fresh = p.filter(function(d){ return used.indexOf(d.name) < 0; });
+    if (fresh.length) p = fresh;
+
+    var today = p.filter(function(d){ return S.rolled.indexOf(d.name) < 0; });
+    if (today.length) p = today;
+    return p;
+  }
+
+  function addSoup(){
+    if (!MEAL.base || baseIsSoup()) return;
+    var pool = mealFilter(DISHES.filter(function(d){ return d.soup === 1; }));
+    if (!pool.length){ setHint("汤都喝遍了，今天先不配"); return; }
+    MEAL.soup = pick(pool);
+    syncMeal();
+    playTick(true);
+    vibrate(8);
+    setHint("");
+    liveEl.textContent = "配了 " + MEAL.soup.name;
+  }
+
+  function addSide(){
+    if (!MEAL.base) return;
+    if (MEAL.sides.length >= MEAL_MAX_DISHES - 1) return;
+    var pool = mealFilter(DISHES.filter(function(d){
+      return d.soup !== 1 && d.staple !== 1;
+    }));
+    if (!pool.length){ setHint("配菜挑不出来了，先这样"); return; }
+    /* 荤素互补：整桌荤多了补素，素多了补荤 */
+    var meat = 0, veg = 0;
+    [MEAL.base].concat(MEAL.sides).forEach(function(d){
+      if (d.tags.indexOf("荤") > -1) meat++;
+      if (d.tags.indexOf("素") > -1) veg++;
+    });
+    var prefer = pool.filter(function(d){
+      return (d.tags.indexOf("荤") > -1) === (meat <= veg);
+    });
+    MEAL.sides.push(pick(prefer.length ? prefer : pool));
+    syncMeal();
+    playTick(true);
+    vibrate(8);
+    setHint("");
+    liveEl.textContent = "又加了 " + MEAL.sides[MEAL.sides.length - 1].name;
+  }
+
+  function startMeal(d){
+    MEAL.base = d || null;
+    MEAL.soup = null;
+    MEAL.sides = [];
+    syncMeal();
+  }
+
+  function clearMeal(){
+    MEAL.base = null;
+    MEAL.soup = null;
+    MEAL.sides = [];
+    syncMeal();
+  }
+
+  function currentMealBlock(){
+    var view = S.view === "elim" ? viewElim : (S.view === "pk" ? viewPk : viewSign);
+    return view ? view.querySelector(".meal") : null;
+  }
+
+  function syncMeal(){
+    var on = !!MEAL.base && mealAccepted();
+    pageEl.classList.toggle("meal-on", on);
+    mealBlocks.forEach(function(el){ el.hidden = true; });
+    if (!on) return;
+    var block = currentMealBlock();
+    if (!block) return;
+    block.hidden = false;
+    block.querySelector(".meal-list").textContent = mealParts().join(" · ");
+    var soupBtn = block.querySelector(".meal-soup");
+    var addBtn  = block.querySelector(".meal-add");
+    if (baseIsSoup()){
+      soupBtn.hidden = true;
+    } else {
+      soupBtn.hidden = false;
+      soupBtn.textContent = MEAL.soup ? "换个汤" : "配个汤";
+    }
+    addBtn.hidden = MEAL.sides.length >= MEAL_MAX_DISHES - 1;
   }
 
   /* 落定回弹：只在非降级模式下播 */
@@ -1422,12 +1610,14 @@
     setChipsFaded(false);
     S.dish = null;
     S.relaxMsg = "";
+    clearMeal();
   }
 
   function toResult(d, msg){
     setState("result");
     S.dish = d;
     S.relaxMsg = msg || "";
+    clearMeal();
     showDish(d);
     sealEl.classList.remove("stamped");
     primary.hidden = false;
@@ -1461,6 +1651,7 @@
     liveEl.textContent = "就吃 " + S.dish.name;
     vibrate(20);
     playStamp();
+    startMeal(S.dish);
   }
 
   function toExhausted(){
@@ -1479,6 +1670,7 @@
     setChipsDisabled(false);
     setChipsFaded(true);
     liveEl.textContent = "今日签已尽";
+    clearMeal();
   }
 
   function setChipsDisabled(v){
@@ -1894,6 +2086,7 @@
     syncElimChrome();
     liveEl.textContent = "就吃 " + E.winner.name;
     vibrate(20);
+    startMeal(E.winner);
   }
 
   function elimBack(){
@@ -2176,6 +2369,7 @@
     vibrate(12);
     setTimeout(function(){ vibrate(20); }, 200);
     liveEl.textContent = "就吃 " + P.champion.name;
+    startMeal(P.champion);
   }
 
   function pkBack(){
@@ -2218,6 +2412,7 @@
       setChipsFaded(P.state === "accepted");
       setChipsDisabled(P.busy);
     }
+    syncMeal();
   }
 
   /* ───────── 复制 ───────── */
@@ -2341,7 +2536,13 @@
   });
 
   copyBtn.addEventListener("click", function(){
-    copyResult(copyBtn, S.dish && S.dish.name);
+    copyResult(copyBtn, menuText() || (S.dish && S.dish.name));
+  });
+
+  /* ───────── 一餐的事件 ───────── */
+  mealBlocks.forEach(function(block){
+    block.querySelector(".meal-soup").addEventListener("click", addSoup);
+    block.querySelector(".meal-add").addEventListener("click", addSide);
   });
 
   /* ───────── 玩法二的事件 ───────── */
@@ -2371,7 +2572,7 @@
   elimUndo.addEventListener("click", elimBack);
 
   elimCopy.addEventListener("click", function(){
-    copyResult(elimCopy, E.winner && E.winner.name);
+    copyResult(elimCopy, menuText() || (E.winner && E.winner.name));
   });
 
   /* ───────── 玩法三的事件 ───────── */
@@ -2385,7 +2586,7 @@
   pkSwap.addEventListener("click", pkSwapOut);
   pkUndo.addEventListener("click", pkBack);
   pkCopy.addEventListener("click", function(){
-    copyResult(pkCopy, P.champion && P.champion.name);
+    copyResult(pkCopy, menuText() || (P.champion && P.champion.name));
   });
 
   /* ───────── 玩法切换 ───────── */
