@@ -11,29 +11,25 @@
 
 | 文件 | 说明 |
 |---|---|
-| `index.html` | **唯一需要部署的文件**。CSS / JS / 100 道菜库 / 音效合成全内联 |
-| `dist/` | 已初始化的 Git 仓库，只含 `index.html` + 极简 README，直接推 Gitee 即可 |
+| `index.html` | **唯一需要部署的文件**，也是唯一需要修改的文件。CSS / JS / 100 道菜库 / 音效合成全内联 |
 | `PRD.md` | 产品规格：状态机、交互规则、验收标准 |
 | `dishes.md` | 菜库清单（已定稿，内容已同步进 `index.html`，仅作审校留档） |
 
-> `dist/index.html` 是根目录 `index.html` 的副本。**改完根目录的文件后，记得覆盖到 `dist/` 再推送**：
-> `Copy-Item index.html dist\index.html -Force`
+> `dist/` 是早期遗留的旧副本，**已废弃**，不以它为准，任何修改都只发生在根目录的 `index.html`。
 
 ## 推到 Gitee
 
-`dist/` 已经 `git init` 并完成了首次提交，只差一个远端：
+仓库根目录就是部署产物（`index.html` 在根上），直接推当前分支即可：
 
 ```powershell
-cd dist
-git remote add origin https://gitee.com/<你的用户名>/<仓库名>.git
-git branch -M master
-git push -u origin master
+git add index.html
+git commit -m "update"
+git push
 ```
 
-然后在 Gitee 仓库页 → 服务 → **Gitee Pages** → 部署分支选 `master`、部署目录留空 → 启动。
+然后在 Gitee 仓库页 → 服务 → **Gitee Pages** → 部署分支选 `main`、部署目录留空 → 启动。
 
-以后更新：改根目录的 `index.html` → 覆盖到 `dist/` → `git commit -am "update"` → `git push`。
-Gitee Pages **不会自动重新部署**，每次推送后需要回仓库页点一次「更新」。
+Gitee Pages **不会自动重新部署**，每次推送后需要回仓库页点一次「更新」，否则线上还是旧版本。
 
 ## 本地预览
 
@@ -49,8 +45,9 @@ EdgeOne Makers 就是 2026-06 更名后的 EdgeOne Pages，静态资源**不需�
 **三步：**
 
 1. 打开 [EdgeOne Makers 控制台](https://console.tencentcloud.com/edgeone/makers) → 新建项目 → 选择 **直接上传（Upload Directly）**。
-2. 把 `dist/` 里的内容拖进去（`dist/` 根上就是 `index.html`）。也可以直接用它连 Git 仓库——`dist/` 已经是干净的仓库根。
-   - 若上传的是文件夹，确保根目录下就是 `index.html`——不要多套一层 `dist/` 或 `今天吃什么/`。
+2. 把根目录的 `index.html` 拖进去。
+   - 若上传的是文件夹，确保根目录下就是 `index.html`——不要多套一层 `今天吃什么/`，也不要用 `dist/`。
+   - 也可以直接用当前 Git 仓库连 EdgeOne，构建命令留空即可。
 3. 部署完成后会拿到一个 `*.edgeone.app` 之类的默认域名，直接访问即可。
 
 **换自定义域名（可选，以后再做）**：项目 → 域名管理 → 添加自定义域名 → 按提示在 DNS 加一条 CNAME → 证书用平台的免费证书。
