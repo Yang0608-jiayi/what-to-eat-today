@@ -86,6 +86,7 @@ git push github v4.2
 | `v4.0` | 守擂玩法、三段玩法切换 |
 | `v4.1` | 守擂硬上限：最多 5 道菜，最后一轮必须二选一 |
 | `v4.2` | 文档：新增 GitHub 远端与双远端推送流程 |
+| `v4.3` | 配色（Fields of Barley）、卡片圆角加大、底部导航上移 |
 
 ## 本地预览
 
@@ -125,6 +126,9 @@ EdgeOne Makers 就是 2026-06 更名后的 EdgeOne Pages，静态资源**不需�
 | 加/删/换菜 | 搜索 `var DISHES = [`，数组里每项 `{name, desc, tags}` |
 | 按钮、收尾语、提示文案 | 搜索 `今天吃什么` / `摇一签` / `就它了` |
 | 纸色、墨色、朱红 | `:root` 里的 `--paper` / `--ink` / `--seal` |
+| 配色（珊瑚/蜜桃/奶黄/青/鼠尾草） | `:root` 里的 `--coral` ~ `--sage`，浅色铺面、`*-ink` 写字 |
+| 卡片圆角 | `.card` 的 `border-radius`（14px），按钮在 `.btn` |
+| 悬浮导航离底距离 | `.switch` 的 `bottom`（26px），同步改 `.stage` 的底部内边距与 `.sound` |
 | 签的高宽比 | `--sign-h` 与 `.sign` 的 `aspect-ratio` |
 | 摇签时长 | 搜索 `500 + Math.round(Math.random() * 300)` |
 | 音效音量 | 搜索 `var MASTER =` |
