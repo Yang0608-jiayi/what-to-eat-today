@@ -683,9 +683,19 @@
 | chip 重发 | ✅ 换 chip 后额度重置回 `还能换 3 次` |
 | 控制台 / 网络 | ✅ 无报错；除文档外零请求 |
 
+### v4.2（版本记录）
+
+纯文档 / 工程侧变更，`index.html` 一行未动：
+
+1. ~~双远端~~ ✅ `origin` = Gitee、`github` = GitHub，两者引用逐项核对一致（`main` 与 `v1.0`–`v4.1` 六个附注标签）
+2. ~~推送流程文档化~~ ✅ README 新增「推到两个远端」，写明两条 `git push`、标签需各推一次、PowerShell 红字不是错误
+3. ~~网络问题留档~~ ✅ GitHub 直连会在 TLS 阶段被重置，记录只给 github.com 配代理的仓库本地做法
+4. ~~Vercel 预留~~ ✅ GitHub 远端用于后续 Vercel 部署（免备案），当前对外地址仍是 Gitee Pages
+
 ## 14. 部署
 
 - 部署产物就是仓库根目录的 `index.html`，**不需要构建**。
-- 当前走 Gitee Pages：推送后在仓库页 → 服务 → Gitee Pages → 点「更新」。
+- 当前对外地址走 Gitee Pages：推送后在仓库页 → 服务 → Gitee Pages → 点「更新」。
+- 同一份代码另推一份到 GitHub（远端 `github`），为后续 Vercel 部署预留；Vercel 免备案，导入仓库后框架选 Other、构建命令与输出目录留空即可。仓库结构不变，两个远端内容保持一致。
 - 也可用 EdgeOne Makers：直接上传根目录的 `index.html`，或连 Git 仓库、构建命令留空。
 - 上线后注意：静态资源默认会被 CDN 缓存，**更新后需重新部署**，否则可能看到旧版本。

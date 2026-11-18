@@ -18,21 +18,44 @@
 
 > `dist/` 是早期遗留的旧副本，**已废弃**，不以它为准，任何修改都只发生在根目录的 `index.html`。
 
-## 推到 Gitee
+## 推到两个远端（Gitee + GitHub）
 
-仓库根目录就是部署产物（`index.html` 在根上），直接推当前分支即可：
+两个远端并存：`origin` 是 Gitee（`main` 跟踪它），`github` 是 GitHub。仓库根目录就是部署产物（`index.html` 在根上），两边内容应始终保持一致。
 
 ```powershell
 git add index.html dishes.md PRD.md README.md tools/validate.mjs
-git commit -m "v4: 新增守擂玩法 + 三段玩法切换"
-git tag -a v4.0 -m "v4.0 新增守擂玩法"
-git push
-git push origin v4.0
+git commit -m "v4.2: 一句话说明这一版改了什么"
+git tag -a v4.2 -m "v4.2 一句话说明"
+
+git push origin main      # Gitee
+git push github main      # GitHub
+git push origin v4.2      # 标签要单独推，两个远端各一次
+git push github v4.2
 ```
 
-然后在 Gitee 仓库页 → 服务 → **Gitee Pages** → 部署分支选 `main`、部署目录留空 → 启动。
+- `git push github main` 里的 `main` **不能省**：本地只跟踪 `origin/main`，直接敲 `git push github` 会提示没有上游分支。
+- GitHub 远端是给以后部署预留的，**Gitee Pages 仍是当前对外地址**。
+- 推送时 PowerShell 会把 git 的 stderr 当异常，输出一片红字。那是进度信息，不是错误；成不成功看引用：
 
-Gitee Pages **不会自动重新部署**，每次推送后需要回仓库页点一次「更新」，否则线上还是旧版本。
+```powershell
+git ls-remote --heads --tags github
+```
+
+`main` 的 hash 应与 `git log -1 --format=%h` 相同，标签应与 Gitee 齐全。
+
+### Gitee Pages 需要手动更新
+
+Gitee Pages **不会自动重新部署**，每次推送后要回仓库页 → 服务 → **Gitee Pages** → 点一次「更新」，否则线上还是旧版本。
+
+### 连不上 GitHub 时
+
+GitHub 的 HTTPS 在部分网络下会在 TLS 握手阶段被重置（`Recv failure: Connection was reset`），`git ls-remote` 直接失败。若本机有代理（如 Clash 默认 `127.0.0.1:7897`），只给 github.com 配代理，不要动全局：
+
+```powershell
+git config http.https://github.com.proxy http://127.0.0.1:7897
+```
+
+这是**仓库本地配置**（写在 `.git/config`），重新 clone 后要重设，代理换端口也要改。Gitee 保持直连，不受影响。
 
 ## 版本标签
 
@@ -40,15 +63,17 @@ Gitee Pages **不会自动重新部署**，每次推送后需要回仓库页点�
 
 ```powershell
 git add index.html PRD.md README.md
-git commit -m "v4: 一句话说明这一版改了什么"
-git tag -a v4.0 -m "v4.0 一句话说明"
-git push
-git push origin v4.0      # 标签不会跟着 git push 自动走，要单独推
+git commit -m "v4.2: 一句话说明这一版改了什么"
+git tag -a v4.2 -m "v4.2 一句话说明"
+git push origin main
+git push github main
+git push origin v4.2      # 标签不会跟着分支自动走，两个远端各推一次
+git push github v4.2
 ```
 
 - 功能版本用 `vX.0`；只改文档 / 文案这类小改动用 `vX.Y`（如 `v3.1`）。
 - 标签必须是**附注标签**（带 `-a`），这样 `git show v3.0` 能看到这一版改了什么。
-- 打错了可以删掉重打：`git tag -d v3.1` + `git push origin :refs/tags/v3.1`。
+- 打错了可以删掉重打：`git tag -d v3.1`，再 `git push origin :refs/tags/v3.1` 和 `git push github :refs/tags/v3.1`。
 
 已发布的标签：
 
@@ -60,6 +85,7 @@ git push origin v4.0      # 标签不会跟着 git push 自动走，要单独推
 | `v3.1` | 文档：补充版本标签约定 |
 | `v4.0` | 守擂玩法、三段玩法切换 |
 | `v4.1` | 守擂硬上限：最多 5 道菜，最后一轮必须二选一 |
+| `v4.2` | 文档：新增 GitHub 远端与双远端推送流程 |
 
 ## 本地预览
 
