@@ -142,15 +142,65 @@
   [data-state="accepted"] .sign-desc,
   [data-state="exhausted"] .sign-desc{opacity:1}
 
-  /* 摇签动效 */
+  /* 摇签动效：主签摆动 + 两条虚影签条 + 上下渐隐 */
+  .ghosts{
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    opacity:0;
+    transition:opacity .12s linear;
+  }
+  .ghost{
+    position:absolute;
+    top:11%;
+    height:78%;
+    width:16%;
+    border:1px solid rgba(43,38,34,.10);
+    border-radius:5px;
+    background:linear-gradient(178deg,#FCF8F0 0%,#F3EADA 100%);
+    box-shadow:0 8px 16px -14px rgba(43,38,34,.55);
+  }
+  .ghost:nth-child(1){left:3%}
+  .ghost:nth-child(2){right:3%}
+
+  .sign.shuffling{animation:sway .52s ease-in-out infinite}
+  @keyframes sway{
+    0%,100%{transform:rotate(-1.5deg)}
+    50%{transform:rotate(1.5deg)}
+  }
+
+  .sign.shuffling .ghosts{opacity:.8}
+  .sign.shuffling .ghost:nth-child(1){animation:ghostA .46s linear infinite}
+  .sign.shuffling .ghost:nth-child(2){animation:ghostB .54s linear infinite}
+  @keyframes ghostA{
+    0%,100%{transform:translateY(14px) rotate(-1.4deg)}
+    50%{transform:translateY(-14px) rotate(1.4deg)}
+  }
+  @keyframes ghostB{
+    0%,100%{transform:translateY(-16px) rotate(1.2deg)}
+    50%{transform:translateY(16px) rotate(-1.2deg)}
+  }
+
   .sign.shuffling .sign-body{
     animation:shuffle .5s linear infinite;
     filter:blur(1.4px);
+    -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 10px,#000 calc(100% - 10px),transparent 100%);
+    mask-image:linear-gradient(to bottom,transparent 0,#000 10px,#000 calc(100% - 10px),transparent 100%);
   }
   @keyframes shuffle{
-    0%{transform:translateY(-9px)}
-    50%{transform:translateY(9px)}
-    100%{transform:translateY(-9px)}
+    0%{transform:translateY(-10px)}
+    50%{transform:translateY(10px)}
+    100%{transform:translateY(-10px)}
+  }
+
+  /* 停下来的那一下：1.02 → 1.00 回弹 */
+  .sign.settling{
+    animation:settle .18s cubic-bezier(.3,.85,.4,1);
+    transition:none;
+  }
+  @keyframes settle{
+    from{transform:scale(1.02)}
+    to{transform:scale(1)}
   }
 
   [data-state="accepted"] .sign{
@@ -237,8 +287,16 @@
 
   [data-state="exhausted"] .action-slot{display:none}
 
-  .link{
+  .minor-actions{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
     margin-top:12px;
+  }
+
+  .link{
+    margin:0;
     padding:6px 10px;
     border:0;
     background:none;
@@ -248,7 +306,11 @@
     letter-spacing:.08em;
     cursor:pointer;
     border-bottom:1px solid transparent;
-    transition:color .2s,border-color .2s;
+    user-select:none;
+    -webkit-user-select:none;
+    -webkit-touch-callout:none;
+    touch-action:manipulation;
+    transition:color .2s,border-color .2s,opacity .2s;
   }
   .link:hover{color:var(--ink-soft);border-bottom-color:var(--line)}
   .link[hidden]{display:none}
@@ -345,7 +407,10 @@
   }
 
   @media (prefers-reduced-motion:reduce){
-    .sign.shuffling .sign-body{animation:none;filter:none}
+    .ghosts{display:none}
+    .sign.shuffling{animation:none}
+    .sign.settling{animation:none}
+    .sign.shuffling .sign-body{animation:none;filter:none;-webkit-mask-image:none;mask-image:none}
     .sign,[data-state="accepted"] .sign{transition:opacity .15s linear}
     .closing{transition:opacity .15s linear}
     .seal.stamped{animation:stampFlat .15s linear forwards}
@@ -361,6 +426,10 @@
     <h1>今天吃什么</h1>
 
     <div class="sign" id="sign">
+      <div class="ghosts" aria-hidden="true">
+        <span class="ghost"></span>
+        <span class="ghost"></span>
+      </div>
       <div class="sign-body">
         <div class="sign-name blank" id="signName">签</div>
       </div>
@@ -373,7 +442,10 @@
       <p class="closing" id="closing">就它了，去吃吧</p>
     </div>
 
-    <button class="link" id="secondary" hidden>再摇一签</button>
+    <div class="minor-actions">
+      <button class="link" id="secondary" hidden>再摇一签</button>
+      <button class="link" id="copyBtn" hidden>复制</button>
+    </div>
 
     <div class="chips" id="chips">
       <button class="chip" id="chipNoSpicy" aria-pressed="false">不吃辣</button>
@@ -498,7 +570,95 @@
     {name:"凉拌海带丝",desc:"酸辣脆爽，解腻很有效",tags:["素","辣"]},
     {name:"蚝油生菜",desc:"一分钟出锅，清清爽爽",tags:["素","清淡"]},
     {name:"皮蛋豆腐",desc:"冷盘里的安全牌，配粥也好",tags:["素","清淡"]},
-    {name:"拌菠菜",desc:"焯一下拌开，涩味全没了",tags:["素","清淡"]}
+    {name:"拌菠菜",desc:"焯一下拌开，涩味全没了",tags:["素","清淡"]},
+    /* ── 第二版扩充：点心 / 早餐 ── */
+    {name:"韭菜鸡蛋饺子",desc:"素馅的，吃完不犯困",tags:["素","清淡"]},
+    {name:"猪肉白菜饺子",desc:"一盘管饱，蘸醋更香",tags:["荤","清淡"]},
+    {name:"荠菜馄饨",desc:"汤清馅鲜，胃里舒服",tags:["素","清淡"]},
+    {name:"小笼包",desc:"先咬个小口，别烫着",tags:["荤","清淡"]},
+    {name:"皮蛋瘦肉粥",desc:"熬得稠，一碗就够",tags:["荤","清淡"]},
+    {name:"小米粥",desc:"胃不舒服时最想喝它",tags:["素","清淡"]},
+    {name:"白粥咸菜",desc:"简单到不用解释的一顿",tags:["素","清淡"]},
+    {name:"生煎包",desc:"底脆汁多，小心烫嘴",tags:["荤","重口"]},
+    {name:"锅贴",desc:"贴着锅的那面最香",tags:["荤","重口"]},
+    {name:"煎饼果子",desc:"加了薄脆，走路也能吃",tags:["素","重口"]},
+    {name:"豆浆油条",desc:"老搭配，从来不会错",tags:["素","清淡"]},
+    {name:"葱油饼",desc:"层层起酥，趁热最好",tags:["素","重口"]},
+    {name:"烧麦",desc:"糯米裹着肉，很顶饱",tags:["荤","重口"]},
+    {name:"鸡蛋肠粉",desc:"滑溜溜的，几口就没了",tags:["素","清淡"]},
+    /* ── 第二版扩充：汤 ── */
+    {name:"番茄鸡蛋汤",desc:"酸甜的，先喝两口再说",tags:["素","清淡"]},
+    {name:"冬瓜丸子汤",desc:"汤清丸子弹，夏天合适",tags:["荤","清淡"]},
+    {name:"萝卜排骨汤",desc:"炖到萝卜透明就好了",tags:["荤","清淡"]},
+    {name:"莲藕排骨汤",desc:"藕粉糯，汤带一点甜",tags:["荤","清淡"]},
+    {name:"老鸭汤",desc:"慢炖出来的，越喝越暖",tags:["荤","清淡"]},
+    {name:"冬瓜薏米汤",desc:"去湿气，喝着很轻",tags:["素","清淡"]},
+    {name:"菌菇鸡汤",desc:"菌子把汤吊得很鲜",tags:["荤","清淡"]},
+    {name:"酸辣汤",desc:"胡椒够重，喝完冒汗",tags:["素","辣"]},
+    {name:"胡辣汤",desc:"早上来一碗，人就醒了",tags:["荤","辣"]},
+    {name:"海带豆腐汤",desc:"清清淡淡，配饭刚好",tags:["素","清淡"]},
+    {name:"白菜豆腐汤",desc:"最家常的一碗热汤",tags:["素","清淡"]},
+    {name:"丝瓜蛋汤",desc:"清甜，夏天喝着舒服",tags:["素","清淡"]},
+    {name:"罗宋汤",desc:"番茄和牛肉，酸得开胃",tags:["荤","清淡"]},
+    /* ── 第二版扩充：面 / 粉 ── */
+    {name:"云吞面",desc:"汤底清，云吞皮薄",tags:["荤","面","清淡"]},
+    {name:"雪菜肉丝面",desc:"咸鲜口，汤都能喝完",tags:["荤","面","清淡"]},
+    {name:"猪肝面",desc:"肝嫩汤浓，补得很实在",tags:["荤","面","清淡"]},
+    {name:"排骨面",desc:"排骨炖得脱骨，面也入味",tags:["荤","面","清淡"]},
+    {name:"肥肠面",desc:"处理得干净，越吃越香",tags:["荤","面","重口"]},
+    {name:"新疆炒米粉",desc:"酱汁裹满，辣得过瘾",tags:["荤","面","辣"]},
+    {name:"干炒牛河",desc:"锅气足，牛肉还嫩",tags:["荤","面","重口"]},
+    {name:"臊子面",desc:"酸香一口，汤要喝光",tags:["荤","面","辣"]},
+    {name:"大盘鸡拌面",desc:"鸡肉和面，一盘全解决",tags:["荤","面","重口"]},
+    {name:"凉皮",desc:"酸辣爽口，夏天常点",tags:["素","面","辣"]},
+    {name:"小锅米线",desc:"酸辣烫嘴，越吃越热",tags:["素","面","辣"]},
+    {name:"菌汤面",desc:"汤鲜面滑，不油不腻",tags:["素","面","清淡"]},
+    /* ── 第二版扩充：素家常 ── */
+    {name:"干煸杏鲍菇",desc:"煸到微焦，比肉还香",tags:["素","辣"]},
+    {name:"香菇烧豆腐",desc:"汤汁收得刚好，下饭",tags:["素","清淡"]},
+    {name:"蒜蓉茼蒿",desc:"一把菜，几分钟就好",tags:["素","清淡"]},
+    {name:"清炒芦笋",desc:"脆嫩，吃完嘴里很清爽",tags:["素","清淡"]},
+    {name:"白灼菜心",desc:"淋点豉油就很好吃",tags:["素","清淡"]},
+    {name:"蘑菇炒蛋",desc:"软乎乎的，配粥配饭",tags:["素","清淡"]},
+    {name:"番茄土豆片",desc:"酸甜软糯，很家常",tags:["素","清淡"]},
+    {name:"醋溜豆芽",desc:"脆生生的，酸得开胃",tags:["素","辣"]},
+    {name:"芹菜炒香干",desc:"香干有嚼劲，越嚼越香",tags:["素","清淡"]},
+    {name:"香煎豆腐",desc:"外焦里嫩，辣汁一浇",tags:["素","辣"]},
+    {name:"青椒炒蛋",desc:"青椒微辣，蛋很嫩",tags:["素","辣"]},
+    {name:"红烧冬瓜",desc:"烧得入味，吃着像肉",tags:["素","重口"]},
+    /* ── 第二版扩充：素凉菜 ── */
+    {name:"凉拌豆腐丝",desc:"细丝拌开，清爽解腻",tags:["素","清淡"]},
+    {name:"凉拌腐竹",desc:"泡得软，辣油一拌",tags:["素","辣"]},
+    {name:"凉拌莴笋丝",desc:"脆的，嚼着有声音",tags:["素","清淡"]},
+    {name:"凉拌苦菊",desc:"微苦回甘，很下火",tags:["素","清淡"]},
+    {name:"凉拌藕片",desc:"薄片脆爽，酸辣刚好",tags:["素","辣"]},
+    {name:"蒜泥茄子",desc:"蒸软了拌蒜，很下饭",tags:["素","辣"]},
+    {name:"凉拌三丝",desc:"粉丝黄瓜胡萝卜，清爽",tags:["素","清淡"]},
+    {name:"盐水毛豆",desc:"剥着吃，配冰啤正好",tags:["素","清淡"]},
+    /* ── 第二版扩充：海鲜 ── */
+    {name:"清蒸多宝鱼",desc:"肉厚刺少，蒸出来最鲜",tags:["荤","海鲜","清淡"]},
+    {name:"姜葱炒蟹",desc:"蟹肉甜，姜葱压得住",tags:["荤","海鲜","清淡"]},
+    {name:"蒜蓉生蚝",desc:"一口一个，鲜得很直接",tags:["荤","海鲜","重口"]},
+    {name:"椒盐皮皮虾",desc:"壳脆肉甜，剥得手上都是",tags:["荤","海鲜","重口"]},
+    {name:"番茄龙利鱼",desc:"没刺，酸甜口很省事",tags:["荤","海鲜","清淡"]},
+    /* ── 第二版扩充：家常荤菜 ── */
+    {name:"红烧鸡腿",desc:"酱汁浓，拌饭特别香",tags:["荤","重口"]},
+    {name:"啤酒鸭",desc:"鸭肉酥烂，汤汁能拌饭",tags:["荤","重口"]},
+    {name:"豆豉蒸排骨",desc:"咸香入味，上锅就能等",tags:["荤","清淡"]},
+    {name:"洋葱炒牛肉",desc:"洋葱炒软，牛肉还嫩",tags:["荤","清淡"]},
+    {name:"蒜苗炒腊肉",desc:"腊味咸香，蒜苗解腻",tags:["荤","辣"]},
+    {name:"青椒肉丝",desc:"家常下饭，青椒要脆",tags:["荤","清淡"]},
+    {name:"口蘑炒肉片",desc:"口蘑吸汁，肉片滑嫩",tags:["荤","清淡"]},
+    {name:"盐煎肉",desc:"煎得微焦，咸香带辣",tags:["荤","辣"]},
+    {name:"腐竹焖鸭",desc:"腐竹吸饱汤汁，很入味",tags:["荤","重口"]},
+    {name:"土豆烧鸡",desc:"土豆吸汁，鸡肉炖得烂",tags:["荤","重口"]},
+    /* ── 第二版扩充：重口硬菜 ── */
+    {name:"粉蒸肉",desc:"米粉裹着肉，软糯咸香",tags:["荤","重口"]},
+    {name:"东坡肉",desc:"肥而不腻，一筷子就化",tags:["荤","重口"]},
+    {name:"酱大骨",desc:"啃着吃，手上油也值",tags:["荤","重口"]},
+    {name:"铁锅炖大鹅",desc:"越炖越香，适合人多",tags:["荤","重口"]},
+    {name:"干锅肥肠",desc:"干香带辣，配饭很凶",tags:["荤","辣"]},
+    {name:"水煮肉片",desc:"辣得直接，肉片很嫩",tags:["荤","辣"]},
   ];
 
   /* ───────── 元素 ───────── */
@@ -510,6 +670,7 @@
   var primary   = document.getElementById("primary");
   var closing   = document.getElementById("closing");
   var secondary = document.getElementById("secondary");
+  var copyBtn   = document.getElementById("copyBtn");
   var chips     = document.getElementById("chips");
   var chipNoSpicy = document.getElementById("chipNoSpicy");
   var chipGentle  = document.getElementById("chipGentle");
@@ -530,6 +691,12 @@
     try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){}
   }
 
+  /* 触觉：静音只管听，振动照旧；不支持的浏览器静默跳过 */
+  function vibrate(ms){
+    if (!navigator.vibrate) return;
+    try{ navigator.vibrate(ms); }catch(e){}
+  }
+
   var S = {
     state: "idle",
     dish: null,
@@ -539,6 +706,8 @@
     muted: read("jtsmc.muted", false) === true,
     rolled: [],
     undone: read("jtsmc.undone", []) || [],
+    exclude: [],
+    rollCount: 0,
     outletUsed: false,
     relaxMsg: ""
   };
@@ -706,11 +875,18 @@
   }
 
   /* ───────── 选择逻辑 ───────── */
+  function flavorOf(d){
+    if (d.tags.indexOf("辣") > -1) return "辣";
+    if (d.tags.indexOf("清淡") > -1) return "清淡";
+    return "重口";
+  }
+
   function match(d, noSpicy, gentle, noodle){
     var t = d.tags;
     if (noSpicy && t.indexOf("辣") > -1) return false;
     if (gentle && t.indexOf("清淡") < 0) return false;
     if (noodle && t.indexOf("面") < 0) return false;
+    if (S.exclude.length && S.exclude.indexOf(flavorOf(d)) > -1) return false;
     return true;
   }
 
@@ -728,6 +904,12 @@
       gentle = false;
       pool = DISHES.filter(function(d){ return match(d, S.noSpicy, gentle, noodle); });
       msg = "没有完全符合的，帮你放开了「清淡点」";
+    }
+    /* 长按排除到无解时的兜底：清空排除集，保证永远摇得出来 */
+    if (!pool.length && S.exclude.length){
+      S.exclude = [];
+      pool = DISHES.filter(function(d){ return match(d, S.noSpicy, gentle, noodle); });
+      msg = "排到没得选了，重新来过";
     }
     return { pool: pool, msg: msg };
   }
@@ -750,6 +932,37 @@
   function setHint(text){
     hintEl.textContent = text || "";
     hintEl.classList.toggle("on", !!text);
+  }
+
+  /* 落定回弹：只在非降级模式下播 */
+  function settleSign(){
+    if (reduced) return;
+    sign.classList.remove("settling");
+    void sign.offsetWidth;
+    sign.classList.add("settling");
+    setTimeout(function(){ sign.classList.remove("settling"); }, 200);
+  }
+
+  /* 同一会话第 3 次摇之后，提示一次长按，每天最多一次 */
+  var TIP_TEXT = "老是摇不到？长按「再摇一签」可以跳过这一类";
+
+  function maybeTip(msg){
+    if (S.rollCount < 3) return;
+    if (msg) return;
+    if (read("jtsmc.tipSeen", "") === logicalDay()) return;
+    setTimeout(function(){
+      if (S.state !== "result") return;
+      write("jtsmc.tipSeen", logicalDay());
+      setHint(TIP_TEXT);
+      setTimeout(function(){
+        if (hintEl.textContent === TIP_TEXT) setHint("");
+      }, 5000);
+    }, 500);
+  }
+
+  function resetCopy(){
+    copyBtn.hidden = true;
+    copyBtn.textContent = "复制";
   }
 
   /* 字号按签的实际高度算，保证任何尺寸下都不压到下方的说明 */
@@ -784,6 +997,7 @@
     primary.textContent = "摇一签";
     primary.dataset.action = "roll";
     secondary.hidden = true;
+    resetCopy();
     setHint("");
     setChipsDisabled(false);
     S.dish = null;
@@ -803,9 +1017,11 @@
     secondary.hidden = false;
     secondary.textContent = "再摇一签";
     secondary.dataset.action = "roll";
+    resetCopy();
     setHint(msg);
     setChipsDisabled(false);
     liveEl.textContent = "今天吃 " + d.name;
+    maybeTip(msg);
   }
 
   function toAccepted(){
@@ -817,8 +1033,11 @@
     secondary.hidden = S.undone.indexOf(S.dish.name) > -1;
     secondary.textContent = "再想想";
     secondary.dataset.action = "undo";
+    copyBtn.hidden = false;
+    copyBtn.textContent = "复制";
     setChipsDisabled(true);
     liveEl.textContent = "就吃 " + S.dish.name;
+    vibrate(20);
     playStamp();
   }
 
@@ -833,6 +1052,7 @@
     secondary.hidden = false;
     secondary.textContent = "不管了，随机来一个";
     secondary.dataset.action = "outlet";
+    resetCopy();
     setHint("");
     setChipsDisabled(false);
     liveEl.textContent = "今日签已尽";
@@ -858,7 +1078,7 @@
   var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var rolling = false;
 
-  function roll(ignoreRolled){
+  function roll(ignoreRolled, notice){
     if (rolling) return;
     rolling = true;
 
@@ -876,6 +1096,7 @@
     setHint("");
     primary.disabled = true;
     secondary.hidden = true;
+    resetCopy();
     setChipsDisabled(true);
     sealEl.classList.remove("stamped");
 
@@ -895,10 +1116,13 @@
       var d = pick(list);
       S.rolled.push(d.name);
       write("jtsmc.rolled", S.rolled);
+      S.rollCount += 1;
 
       rolling = false;
+      settleSign();
       playSettle();
-      toResult(d, c.msg);
+      vibrate(12);
+      toResult(d, notice || c.msg);
     }, dur);
   }
 
@@ -926,8 +1150,80 @@
     secondary.hidden = false;
     secondary.textContent = "再摇一签";
     secondary.dataset.action = "roll";
+    resetCopy();
     setChipsDisabled(false);
     liveEl.textContent = "今天吃 " + S.dish.name;
+  }
+
+  /* ───────── 复制 ───────── */
+  function legacyCopy(text){
+    try{
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.top = "-1000px";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      var ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    }catch(e){ return false; }
+  }
+
+  function copyResult(){
+    if (S.state !== "accepted" || !S.dish) return;
+    var text = "今天吃：" + S.dish.name;
+    function done(ok){
+      copyBtn.textContent = ok ? "已复制" : "复制失败";
+      liveEl.textContent = ok ? "已复制" : "复制失败";
+      setTimeout(function(){
+        if (S.state === "accepted") copyBtn.textContent = "复制";
+      }, 1200);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ done(true); }, function(){ done(legacyCopy(text)); });
+    } else {
+      done(legacyCopy(text));
+    }
+  }
+
+  /* ───────── 长按「再摇一签」：跳过当前这道所属的味道 ───────── */
+  var PRESS_MS = 450;
+  var pressTimer = null;
+  var suppressSecondaryClick = false;
+
+  function clearPressTimer(){
+    if (pressTimer){ clearTimeout(pressTimer); pressTimer = null; }
+  }
+
+  function excludeCurrentFlavor(){
+    if (S.state !== "result" || !S.dish) return;
+    var flavor = flavorOf(S.dish);
+    var notice = "";
+
+    /* chip 正在强制这个味道时，用户的长按就是明确要关掉它 */
+    if (flavor === "清淡" && S.gentle){
+      S.gentle = false;
+      syncChips();
+      notice = "先关掉「清淡点」";
+    }
+
+    if (S.exclude.indexOf(flavor) < 0){
+      if (S.exclude.length >= 2){
+        S.exclude = [];
+        notice = "三种都排完了，重新来过";
+      } else {
+        S.exclude.push(flavor);
+        if (!notice) notice = "这次不要「" + flavor + "」的";
+      }
+    }
+
+    vibrate(12);
+    playTick(false);
+    roll(false, notice);
   }
 
   /* ───────── 事件 ───────── */
@@ -937,7 +1233,38 @@
     else if (a === "roll") roll(false);
   });
 
+  secondary.addEventListener("pointerdown", function(e){
+    if (S.state !== "result" || secondary.dataset.action !== "roll") return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    /* 新的一次按下说明上回手势已经结束，顺手解除残留的 click 抑制 */
+    suppressSecondaryClick = false;
+    clearPressTimer();
+    pressTimer = setTimeout(function(){
+      pressTimer = null;
+      suppressSecondaryClick = true;
+      excludeCurrentFlavor();
+    }, PRESS_MS);
+  });
+
+  /* 长按已经生效，松手后的 click 不该再摇一次 */
+  function endPress(){
+    clearPressTimer();
+  }
+
+  /* 键盘操作没有 pointerdown，直接清掉残留的抑制 */
+  secondary.addEventListener("keydown", function(e){
+    if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") suppressSecondaryClick = false;
+  });
+  secondary.addEventListener("pointerup", endPress);
+  secondary.addEventListener("pointercancel", endPress);
+  secondary.addEventListener("pointerleave", endPress);
+  secondary.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+
   secondary.addEventListener("click", function(){
+    if (suppressSecondaryClick){
+      suppressSecondaryClick = false;
+      return;
+    }
     var a = secondary.dataset.action;
     if (a === "undo") undo();
     else if (a === "outlet"){
@@ -947,6 +1274,8 @@
     }
     else roll(false);
   });
+
+  copyBtn.addEventListener("click", copyResult);
 
   /* 结果 / 签尽状态下改条件：作废当前画面，回到待摇，不自动重摇 */
   function afterChipChange(){
