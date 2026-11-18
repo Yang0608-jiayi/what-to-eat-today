@@ -561,6 +561,10 @@
   .pk-lead{transition:opacity .25s var(--ease)}
   .view-pk[data-state="accepted"] .pk-lead{opacity:0}
 
+  /* 决赛态没有主按钮：决定就在两张牌上，空槽要收掉 */
+  .view-pk.final .action-slot,
+  .view-pk.final .minor-actions{display:none}
+
   /* 新上场的牌：轻轻浮上来，不抢戏 */
   .card.in{animation:cardIn .24s var(--ease) both}
   @keyframes cardIn{
@@ -723,7 +727,7 @@
 
     <div class="view view-pk" id="viewPk" data-state="face" role="tabpanel" aria-labelledby="tabPk" hidden>
 
-      <p class="pk-lead">点你想留的那个，另一个换掉</p>
+      <p class="pk-lead" id="pkLead">点你想留的那个，另一个换掉</p>
 
       <div class="cards duel" id="duelCards"></div>
 
@@ -994,6 +998,7 @@
   var elimCopy    = document.getElementById("elimCopy");
 
   var duelEl    = document.getElementById("duelCards");
+  var pkLead    = document.getElementById("pkLead");
   var pkCount   = document.getElementById("pkCount");
   var pkPrimary = document.getElementById("pkPrimary");
   var pkSwap    = document.getElementById("pkSwap");
@@ -1049,12 +1054,10 @@
     state: "face",
     champion: null,
     challenger: null,
-    beaten: [],
     seen: [],
     basePool: [],
     relaxed: false,
-    streak: 0,
-    rounds: 0,
+    final: false,
     busy: false
   };
 
@@ -1858,7 +1861,8 @@
   }
 
   /* ───────── 玩法三：守擂 ───────── */
-  var PK_HINT_ROUND = 6;
+  /* 一场最多看几道菜：到顶后不再换牌，最后两张必须点一个结束 */
+  var PK_MAX_DISHES = 5;
 
   function kindOf(d){ return d.tags.indexOf("荤") > -1 ? "荤" : "素"; }
   function hasNoodle(d){ return d.tags.indexOf("面") > -1; }
@@ -1946,17 +1950,26 @@
   }
 
   function syncPkChrome(){
-    var n = P.beaten.length;
+    var n = pkGone();
+    /* 决赛态要收掉空的按钮槽 */
+    viewPk.classList.toggle("final", P.state === "face" && P.final);
 
     if (P.state === "face"){
-      pkCount.textContent = n ? "已淘汰 " + n + " 道" : "";
-      pkPrimary.hidden = false;
+      if (P.final){
+        pkLead.textContent = P.challenger ? "最后两道，选一个就结束" : "就剩它了，点一下";
+        pkCount.textContent = n ? "已淘汰 " + n + " 道" : "";
+      } else {
+        pkLead.textContent = "点你想留的那个，另一个换掉";
+        pkCount.textContent = "还能换 " + Math.max(0, PK_MAX_DISHES - P.seen.length) + " 次";
+      }
+      /* 决赛不再给「就吃它」和「换一个」：出路只有点其中一张牌 */
+      pkPrimary.hidden = P.final;
       pkPrimary.textContent = "就吃它";
-      pkSwap.hidden = !P.challenger;
+      pkSwap.hidden = P.final || !P.challenger;
       pkUndo.hidden = true;
       pkCopy.hidden = true;
     } else {
-      pkCount.textContent = n ? "比了 " + (n + 1) + " 道，最后留下它" : "";
+      pkCount.textContent = P.seen.length > 2 ? "比了 " + P.seen.length + " 道，最后留下它" : "";
       pkPrimary.hidden = true;
       pkSwap.hidden = true;
       pkUndo.hidden = !P.champion || S.undone.indexOf(P.champion.name) > -1;
@@ -1970,10 +1983,8 @@
 
   /* 开局 / 重发：清空本场记录，发一对反差最大的牌 */
   function pkDeal(){
-    P.beaten = [];
     P.seen = [];
-    P.rounds = 0;
-    P.streak = 0;
+    P.final = false;
     P.busy = false;
     setPstate("face");
 
@@ -1986,7 +1997,8 @@
     if (!P.champion){
       P.challenger = null;
       duelEl.textContent = "";
-      pkCount.textContent = "今天没得选了";
+      pkLead.textContent = "今天没得选了";
+      pkCount.textContent = "";
       pkPrimary.hidden = true;
       pkSwap.hidden = true;
       return;
@@ -1996,54 +2008,83 @@
     P.challenger = pkChallenger(P.champion);
     if (P.challenger) P.seen.push(P.challenger.name);
 
+    /* 只剩一张牌时没有可比的人，直接进决赛态 */
+    P.final = !P.challenger;
+
     renderDuel(true);
     syncPkChrome();
     setHint(P.relaxed && P.basePool.length < 2 ? "今天这几个方向都吃过了，就它吧" : "");
     if (S.view === "pk") announceDuel();
   }
 
+  /* 补一张挑战者；补完到顶就进决赛态 */
+  function pkNextChallenger(){
+    if (P.seen.length >= PK_MAX_DISHES){
+      P.challenger = null;
+      P.final = true;
+      return;
+    }
+    P.challenger = pkChallenger(P.champion);
+    if (P.challenger) P.seen.push(P.challenger.name);
+    P.final = !P.challenger || P.seen.length >= PK_MAX_DISHES;
+  }
+
+  /* 上过场的牌减去还留在桌上的（1 或 2 张），就是已淘汰 */
+  function pkGone(){
+    return Math.max(0, P.seen.length - (P.challenger ? 2 : 1));
+  }
+
+  /* 决赛态点牌 = 直接定下来 */
+  function pkDecide(name){
+    if (P.busy) return;
+    var keepChampion = name === P.champion.name;
+    if (!keepChampion && (!P.challenger || name !== P.challenger.name)) return;
+
+    if (!keepChampion){
+      var old = P.champion;
+      P.champion = P.challenger;
+      P.challenger = old;
+    }
+    /* 两张牌都留着：点「再想想」能回到同一对，还能翻盘 */
+    renderDuel(false);
+    pkAccept();
+  }
+
   function pkChoose(name){
-    if (P.state !== "face" || P.busy || !P.challenger) return;
-    if (name !== P.champion.name && name !== P.challenger.name) return;
+    if (P.state !== "face" || P.busy) return;
+    if (name !== P.champion.name && (!P.challenger || name !== P.challenger.name)) return;
+
+    /* 决赛：这一下就是决定 */
+    if (P.final){
+      pkDecide(name);
+      return;
+    }
 
     var keepChampion = name === P.champion.name;
     var loser = keepChampion ? P.challenger.name : P.champion.name;
 
     P.busy = true;
-    P.rounds++;
     playTick(true);
     setHint("");
 
-    if (keepChampion){
-      P.streak++;
-    } else {
-      P.champion = P.challenger;
-      P.streak = 1;
-    }
-    P.beaten.push(loser);
-    P.challenger = pkChallenger(P.champion);
-    if (P.challenger) P.seen.push(P.challenger.name);
+    if (!keepChampion) P.champion = P.challenger;
 
     var loserEl = findDuelEl(loser);
     if (loserEl) loserEl.classList.add("out");
 
+    /* 先落败的那张淡出，再补新牌，避免两张同时动 */
     setTimeout(function(){
+      pkNextChallenger();
       renderDuel(true);
       P.busy = false;
       syncPkChrome();
       announceDuel();
-      if (!P.challenger) setHint("今天的菜比得差不多了，就它吧");
-      else if (P.rounds === PK_HINT_ROUND) setHint("已经比了 6 道，要不要就它");
     }, reduced ? 0 : 170);
   }
 
   /* 两个都不想吃：只换挑战者，擂主不动，也不记进淘汰 */
   function pkSwapOut(){
-    if (P.state !== "face" || P.busy || !P.challenger) return;
-    if (!pkAvailable().length) {
-      setHint("今天的菜比得差不多了，就它吧");
-      return;
-    }
+    if (P.state !== "face" || P.busy || P.final || !P.challenger) return;
 
     P.busy = true;
     playTick(false);
@@ -2053,13 +2094,11 @@
     if (old) old.classList.add("out");
 
     setTimeout(function(){
-      P.challenger = pkChallenger(P.champion);
-      if (P.challenger) P.seen.push(P.challenger.name);
+      pkNextChallenger();
       renderDuel(true);
       P.busy = false;
       syncPkChrome();
       announceDuel();
-      if (!P.challenger) setHint("今天的菜比得差不多了，就它吧");
     }, reduced ? 0 : 120);
   }
 
@@ -2088,6 +2127,7 @@
       S.undone.push(P.champion.name);
       write("jtsmc.undone", S.undone);
     }
+    /* 决赛翻案：刚被判出局的那张回到牌桌，淘汰数由 pkGone 自动回退 */
     setPstate("face");
     renderDuel(false);
     syncPkChrome();
