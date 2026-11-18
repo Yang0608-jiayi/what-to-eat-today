@@ -111,6 +111,8 @@
     position:relative;
     width:calc(var(--sign-h) / 2.6);
     height:var(--sign-h);
+    /* 顶边是缩放原点：放大时向下长，不侵占导航下方那条缝 */
+    transform-origin:50% 0;
     background:linear-gradient(178deg,var(--paper-hi) 0%,#FBF0E0 100%);
     border:1px solid rgba(176,78,51,.16);
     border-radius:6px;
@@ -234,8 +236,10 @@
     to{transform:scale(1)}
   }
 
+  /* 放大只向下长：以顶边为原点，导航下方那条 12px 的缝隙不会被吃掉。
+     旧版对称放大（1.075 / 中心原点）在 1280 以上会向上顶进发丝线 2–4px */
   [data-state="accepted"] .sign{
-    transform:scale(1.075);
+    transform:scale(1.05);
     box-shadow:0 1px 0 rgba(255,255,255,.85) inset,
                0 26px 44px -28px rgba(43,38,34,.6);
   }

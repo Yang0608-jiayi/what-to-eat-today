@@ -92,6 +92,7 @@ git push github v4.2
 | `v4.6` | 确认后可配一餐：主食推导、汤池、加菜（上限 3 道） |
 | `v4.7` | 摇签音改「收音机故障」呲呲声；「排除法」→「划掉」、「守擂」→「二选一」 |
 | `v4.8` | 摇签音改成签筒木签（击打 + 木身 + 泛音 + 筒壁延迟），去掉高频噪音 |
+| `v4.9` | 接受态签放大改为只向下长（原点在顶边、1.05），不再压住导航线 |
 
 ## 本地预览
 
@@ -137,6 +138,7 @@ EdgeOne Makers 就是 2026-06 更名后的 EdgeOne Pages，静态资源**不需�
 | 卡片圆角 | `.card` 的 `border-radius`（14px），按钮在 `.btn` |
 | 顶部导航的形态 | `.switch` 的 `border-bottom` 是那条发丝线；`.switch button` 的 `height`（44px）是点击区；`::after` 的 `height` / `bottom` 是选中下划线，`[aria-selected="true"]` 决定文字色 |
 | 签的高宽比 | `--sign-h` 与 `.sign` 的 `aspect-ratio` |
+| 接受态签的放大 | `[data-state="accepted"] .sign` 的 `scale(1.05)`；`.sign` 的 `transform-origin:50% 0` 决定它只向下长、不顶导航线 |
 | 摇签时长 | 搜索 `500 + Math.round(Math.random() * 300)` |
 | 音效音量 | 搜索 `var MASTER =` |
 | 摇签的"签筒木签"音 | 搜索 `function playRattle`：`strike()` 里三段带通分别是击打（1100–1600Hz）、木身（180–240Hz）、泛音（380–450Hz）；`room.delayTime` 是筒壁的 30ms 反射 |
