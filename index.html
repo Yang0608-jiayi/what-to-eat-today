@@ -1225,112 +1225,98 @@
 
   function track(node){ active.push(node); }
 
-  /* 收音机故障的"呲呲"：只把滤波器调窄仍然是沙沙，三样缺一不可——
-     ① 断续门（偶尔掉到近静音）② 扫频带通（像在调台）③ 静电噼啪（短脉冲）
-     ④ 偶发差拍"嘀"（串台的来源），音量极低，听清就过了 */
-  function playStatic(sec, intensity){
+  /* 签筒里的木签：每一下 = 击打（短噪声）+ 木身（窄带闷响）+ 泛音，
+     所有击打共用一个 30ms 延迟当筒壁反射——没有它，听感就是敲桌子 */
+  function playRattle(sec, intensity){
     if (S.muted) return;
     var ctx = audio(); if (!ctx) return;
     var amt = typeof intensity === "number" ? intensity : 1;
     var t0 = ctx.currentTime;
     var end = t0 + sec;
-    var fade = Math.min(0.06, sec * 0.3);
 
-    /* 总出口：高频多了刺耳，砍在 6.8k；低频轰鸣也一并去掉 */
+    /* 出口：木头没有 2.6k 以上的能量，砍在 5.2k，正好避开旧版刺耳那一段 */
     var lp = ctx.createBiquadFilter();
     lp.type = "lowpass";
-    lp.frequency.value = 6800;
+    lp.frequency.value = 5200;
     lp.connect(ctx.destination);
 
-    /* ① 断续门：收音机最标志的是"呲——呲呲—呲"的不规则空档 */
-    var gate = ctx.createGain();
-    gate.connect(lp);
-    gate.gain.setValueAtTime(0, t0);
-    gate.gain.linearRampToValueAtTime(0.85, t0 + 0.02);
-    var t = t0 + 0.02;
-    while (t < end - fade){
-      var lvl = Math.random() < 0.18 ? 0.12 : 0.7 + Math.random() * 0.45;
-      gate.gain.linearRampToValueAtTime(lvl, Math.min(t + 0.006, end - fade));
-      t += 0.03 + Math.random() * 0.06;
-    }
-    gate.gain.linearRampToValueAtTime(0, end);
+    /* 筒壁：30ms 延迟 + 0.18 反馈，短促的空腔；反馈路径再低通一次免得发硬 */
+    var room = ctx.createDelay(0.2);
+    room.delayTime.value = 0.03;
+    var roomFb = ctx.createGain();
+    roomFb.gain.value = 0.18;
+    var roomLp = ctx.createBiquadFilter();
+    roomLp.type = "lowpass";
+    roomLp.frequency.value = 2400;
+    room.connect(roomLp); roomLp.connect(roomFb); roomFb.connect(room);
+    room.connect(lp);
+    var send = ctx.createGain();
+    send.gain.value = 0.4;
+    send.connect(room);
 
-    /* 底噪：宽一点，负责"电流"那一层 */
-    var bed = ctx.createBufferSource();
-    bed.buffer = noise(ctx);
-    var bedHp = ctx.createBiquadFilter();
-    bedHp.type = "highpass";
-    bedHp.frequency.value = 600;
-    var bedBp = ctx.createBiquadFilter();
-    bedBp.type = "bandpass";
-    bedBp.frequency.value = 1900;
-    bedBp.Q.value = 0.9;
-    var bedGain = ctx.createGain();
-    bedGain.gain.value = MASTER * 0.35 * amt;
-    bed.connect(bedHp); bedHp.connect(bedBp); bedBp.connect(bedGain); bedGain.connect(gate);
-    bed.start(t0, Math.random() * 0.2); bed.stop(end + 0.02);
-    track(bed);
+    function strike(at, strong){
+      var v = (strong ? 1 : 0.82 + Math.random() * 0.18) * amt;
+      var src = ctx.createBufferSource();
+      src.buffer = noise(ctx);
 
-    /* 扫频：窄带通的中心随机跳，听感就是"频道在漂" */
-    var sweep = ctx.createBufferSource();
-    sweep.buffer = noise(ctx);
-    var sweepBp = ctx.createBiquadFilter();
-    sweepBp.type = "bandpass";
-    sweepBp.Q.value = 9;
-    var sweepGain = ctx.createGain();
-    sweepGain.gain.value = MASTER * 0.5 * amt;
-    sweep.connect(sweepBp); sweepBp.connect(sweepGain); sweepGain.connect(gate);
-    var sf = t0;
-    while (sf < end - fade){
-      sweepBp.frequency.setValueAtTime(700 + Math.random() * 2900, sf);
-      sf += 0.055 + Math.random() * 0.035;
-    }
-    sweep.start(t0, Math.random() * 0.2); sweep.stop(end + 0.02);
-    track(sweep);
+      /* 击打：12–18ms 的"嗒"，带通压住 1.1–1.6k，不尖 */
+      var hi = ctx.createBiquadFilter();
+      hi.type = "bandpass";
+      hi.frequency.value = 1100 + Math.random() * 500;
+      hi.Q.value = 1.2;
+      var gHi = ctx.createGain();
+      gHi.gain.setValueAtTime(0, at);
+      gHi.gain.linearRampToValueAtTime(MASTER * 0.5 * v, at + 0.0015);
+      gHi.gain.exponentialRampToValueAtTime(0.0005, at + 0.02);
 
-    /* ③ 静电噼啪：矩形包络的短脉冲，这才是"呲"字本身
-       时长按秒数推脉冲数，reduced-motion 的短促一发也走同一条路径 */
-    var pops = Math.min(12, Math.max(1, Math.round(sec * 16 + Math.random() * 3)));
-    var pop = ctx.createBufferSource();
-    pop.buffer = noise(ctx);
-    var popHp = ctx.createBiquadFilter();
-    popHp.type = "highpass";
-    popHp.frequency.value = 2600;
-    var popGain = ctx.createGain();
-    popGain.gain.setValueAtTime(0, t0);
-    var last = 0;
-    for (var p = 0; p < pops; p++){
-      var pt = 0.03 + Math.random() * Math.max(0.02, sec - 0.06);
-      if (pt < last + 0.025) pt = last + 0.025;
-      var len = Math.min(0.005 + Math.random() * 0.009, sec - pt - 0.005);
-      if (len < 0.003) break;
-      popGain.gain.setValueAtTime(0, t0 + pt);
-      popGain.gain.linearRampToValueAtTime(MASTER * (0.35 + Math.random() * 0.25) * amt, t0 + pt + 0.0007);
-      popGain.gain.linearRampToValueAtTime(0, t0 + pt + len);
-      last = pt;
-    }
-    pop.connect(popHp); popHp.connect(popGain); popGain.connect(lp);
-    pop.start(t0, Math.random() * 0.3); pop.stop(end + 0.02);
-    track(pop);
+      /* 木身：200Hz 附近的窄带短尾，"嗒"之后那点闷 */
+      var lo = ctx.createBiquadFilter();
+      lo.type = "bandpass";
+      lo.frequency.value = 180 + Math.random() * 60;
+      lo.Q.value = 6;
+      var gLo = ctx.createGain();
+      gLo.gain.setValueAtTime(0, at);
+      gLo.gain.linearRampToValueAtTime(MASTER * 0.22 * v, at + 0.004);
+      gLo.gain.exponentialRampToValueAtTime(0.0005, at + 0.06);
 
-    /* ④ 差拍"嘀"：一到两次，轻到像串台 */
-    var chirps = sec > 0.3 ? 1 + (Math.random() < 0.45 ? 1 : 0) : 0;
-    for (var c = 0; c < chirps; c++){
-      var ct = t0 + 0.06 + Math.random() * Math.max(0.05, sec - 0.25);
-      var cd = 0.08 + Math.random() * 0.06;
-      var f0 = 900 + Math.random() * 700;
-      var osc = ctx.createOscillator();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(f0, ct);
-      osc.frequency.linearRampToValueAtTime(f0 * 0.97, ct + cd);
-      var og = ctx.createGain();
-      og.gain.setValueAtTime(0, ct);
-      og.gain.linearRampToValueAtTime(MASTER * 0.07 * amt, ct + 0.02);
-      og.gain.linearRampToValueAtTime(0, ct + cd);
-      osc.connect(og); og.connect(gate);
-      osc.start(ct); osc.stop(ct + cd + 0.02);
-      track(osc);
+      /* 泛音：380–450Hz，给"木"一点亮，免得像纸盒 */
+      var mid = ctx.createBiquadFilter();
+      mid.type = "bandpass";
+      mid.frequency.value = 380 + Math.random() * 70;
+      mid.Q.value = 4;
+      var gMid = ctx.createGain();
+      gMid.gain.setValueAtTime(0, at);
+      gMid.gain.linearRampToValueAtTime(MASTER * 0.08 * v, at + 0.003);
+      gMid.gain.exponentialRampToValueAtTime(0.0005, at + 0.05);
+
+      src.connect(hi); src.connect(lo); src.connect(mid);
+      hi.connect(gHi); lo.connect(gLo); mid.connect(gMid);
+      gHi.connect(lp); gHi.connect(send);
+      gLo.connect(lp); gLo.connect(send);
+      gMid.connect(lp); gMid.connect(send);
+
+      src.start(at, Math.random() * 0.6);
+      src.stop(at + 0.09);
+      track(src);
     }
+
+    /* 摇动会衰减：3–6 下，间隔从 95ms 起、每下再长 14%，最后一下略重 */
+    var hits = Math.min(6, Math.max(1, Math.round(sec * 7 + 1)));
+    var t = t0 + 0.03;
+    var gap = 0.095;
+    for (var i = 0; i < hits; i++){
+      if (i > 0 && t > end - 0.08) break;
+      strike(t, i === hits - 1);
+      t += gap;
+      gap *= 1.14;
+    }
+
+    /* 延迟环会一直转，声音落地后把它拆掉，避免每摇一次留一组节点 */
+    setTimeout(function(){
+      [room, roomFb, roomLp, send, lp].forEach(function(n){
+        try{ n.disconnect(); }catch(e){}
+      });
+    }, (sec + 0.6) * 1000);
   }
 
   function thud(fromHz, toHz, dur, level, noiseLevel){
@@ -1794,7 +1780,7 @@
     var dur = reduced ? 150 : 500 + Math.round(Math.random() * 300);
     if (!reduced) sign.classList.add("shuffling");
     /* 声音比动效早约 25ms 收尾，最后那一下留给落定的"咚" */
-    playStatic(reduced ? 0.09 : Math.max(0.16, dur / 1000 - 0.025), 1);
+    playRattle(reduced ? 0.12 : Math.max(0.16, dur / 1000 - 0.025), 1);
 
     var spinPool = pool.length ? pool : DISHES;
     var timer = setInterval(function(){
@@ -2149,8 +2135,8 @@
       }, step * i);
     });
 
-    /* 抽牌用同一套收音机故障音，轻一档，不抢摇签的主角 */
-    playStatic(reduced ? 0.09 : 0.455, 0.6);
+    /* 抽牌用同一套木签声，轻一档，不抢摇签的主角 */
+    playRattle(reduced ? 0.12 : 0.455, 0.6);
 
     setTimeout(function(){
       drawing = false;

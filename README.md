@@ -91,6 +91,7 @@ git push github v4.2
 | `v4.5` | 导航改下划线文字 tab（去胶囊）、标题与音效合行、修正未选中 tab 对比度 |
 | `v4.6` | 确认后可配一餐：主食推导、汤池、加菜（上限 3 道） |
 | `v4.7` | 摇签音改「收音机故障」呲呲声；「排除法」→「划掉」、「守擂」→「二选一」 |
+| `v4.8` | 摇签音改成签筒木签（击打 + 木身 + 泛音 + 筒壁延迟），去掉高频噪音 |
 
 ## 本地预览
 
@@ -138,8 +139,10 @@ EdgeOne Makers 就是 2026-06 更名后的 EdgeOne Pages，静态资源**不需�
 | 签的高宽比 | `--sign-h` 与 `.sign` 的 `aspect-ratio` |
 | 摇签时长 | 搜索 `500 + Math.round(Math.random() * 300)` |
 | 音效音量 | 搜索 `var MASTER =` |
-| 摇签的"收音机故障"音 | 搜索 `function playStatic`：`while (t < end - fade)` 那段是断续门的节奏，`MASTER * 0.35` 是底噪、`Q.value = 9` 是扫频窄度、噼啪段的 `0.35 + Math.random() * 0.25` 是爆点电平 |
-| 划掉抽牌音的轻重 | 搜索 `playStatic(reduced ? 0.09 : 0.455, 0.6)`，第二个参数是强度 |
+| 摇签的"签筒木签"音 | 搜索 `function playRattle`：`strike()` 里三段带通分别是击打（1100–1600Hz）、木身（180–240Hz）、泛音（380–450Hz）；`room.delayTime` 是筒壁的 30ms 反射 |
+| 木签的节奏 | 同一段里的 `var gap = 0.095` 与 `gap *= 1.14`：改前者是起手快慢，改后者是"越摇越慢"的衰减 |
+| 木签的轻重 | `MASTER * 0.5`（击打）/ `0.22`（木身）/ `0.08`（泛音），抽牌音另有 `intensity 0.6` |
+| 划掉抽牌音的轻重 | 搜索 `playRattle(reduced ? 0.12 : 0.455, 0.6)`，第二个参数是强度 |
 | chip 的响声音高/音量 | 搜索 `function playTick` |
 | 长按判定时长（默认 450ms） | 搜索 `var PRESS_MS =` |
 | 振动时长 | 搜索 `function vibrate`，落定 `vibrate(12)`、盖章 `vibrate(20)` |
