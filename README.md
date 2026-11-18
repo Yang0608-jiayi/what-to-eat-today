@@ -88,6 +88,7 @@ git push github v4.2
 | `v4.2` | 文档：新增 GitHub 远端与双远端推送流程 |
 | `v4.3` | 配色（Fields of Barley）、卡片圆角加大、底部导航上移 |
 | `v4.4` | 玩法导航从底部移到页面顶部，音效按钮并入同一行 |
+| `v4.5` | 导航改下划线文字 tab（去胶囊）、标题与音效合行、修正未选中 tab 对比度 |
 
 ## 本地预览
 
@@ -129,7 +130,7 @@ EdgeOne Makers 就是 2026-06 更名后的 EdgeOne Pages，静态资源**不需�
 | 纸色、墨色、朱红 | `:root` 里的 `--paper` / `--ink` / `--seal` |
 | 配色（珊瑚/蜜桃/奶黄/青/鼠尾草） | `:root` 里的 `--coral` ~ `--sage`，浅色铺面、`*-ink` 写字 |
 | 卡片圆角 | `.card` 的 `border-radius`（14px），按钮在 `.btn` |
-| 顶部玩法导航的位置 | `.topbar` 的 `margin-bottom`（14px）；导航居中、音效靠右，改高度同步看 `.stage` 底部内边距 |
+| 顶部导航的形态 | `.switch` 的 `border-bottom` 是那条发丝线；`.switch button` 的 `height`（44px）是点击区；`::after` 的 `height` / `bottom` 是选中下划线，`[aria-selected="true"]` 决定文字色 |
 | 签的高宽比 | `--sign-h` 与 `.sign` 的 `aspect-ratio` |
 | 摇签时长 | 搜索 `500 + Math.round(Math.random() * 300)` |
 | 音效音量 | 搜索 `var MASTER =` |
