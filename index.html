@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#F6F1E7">
+<meta name="description" content="今天吃什么：摇一签，出一道菜，然后去吃饭。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="今天吃什么">
+<meta property="og:description" content="摇一签，出一道菜，然后去吃饭。">
+<title>今天吃什么</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='4' y='4' width='24' height='24' rx='3' fill='none' stroke='%23A93A2C' stroke-width='2.4'/%3E%3Ctext x='16' y='23' font-size='17' text-anchor='middle' fill='%23A93A2C' font-family='sans-serif'%3E%E5%90%83%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --paper:#F6F1E7;
+    --paper-hi:#FFFDF8;
+    --ink:#2B2622;
+    --ink-soft:#6A6157;
+    --muted:#9C9184;
+    --line:rgba(43,38,34,.13);
+    --seal:#A93A2C;
+    --sign-h:clamp(238px,50vh,430px);
+    --font:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
+    --ease:cubic-bezier(.2,.75,.25,1);
+  }
+
+  *{box-sizing:border-box}
+
+  html,body{height:100%}
+
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--font);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  /* 纸的质感：极淡噪点，零请求 */
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    z-index:0;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.045'/%3E%3C/svg%3E");
+  }
+
+  .stage{
+    position:relative;
+    z-index:1;
+    min-height:100vh;
+    min-height:100svh;
+    display:grid;
+    place-items:center;
+    padding:clamp(18px,4vh,44px) 20px;
+  }
+
+  .page{
+    width:100%;
+    max-width:680px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+
+  h1{
+    margin:0 0 clamp(16px,3.2vh,30px);
+    font-size:14px;
+    font-weight:400;
+    letter-spacing:.34em;
+    text-indent:.34em;
+    color:var(--muted);
+  }
+
+  /* ── 签 ───────────────────────────── */
+  .sign{
+    position:relative;
+    width:calc(var(--sign-h) / 2.6);
+    height:var(--sign-h);
+    background:linear-gradient(178deg,var(--paper-hi) 0%,#F8F2E6 100%);
+    border:1px solid var(--line);
+    border-radius:5px;
+    box-shadow:0 1px 0 rgba(255,255,255,.85) inset,
+               0 18px 34px -26px rgba(43,38,34,.55);
+    overflow:hidden;
+    transition:transform .55s var(--ease), box-shadow .55s var(--ease);
+  }
+
+  /* 签条上下的压线 */
+  .sign::before,
+  .sign::after{
+    content:"";
+    position:absolute;
+    left:12px;right:12px;
+    height:1px;
+    background:var(--line);
+  }
+  .sign::before{top:14px}
+  .sign::after{bottom:14px}
+
+  .sign-body{
+    position:absolute;
+    inset:12px 0 62px;
+    display:grid;
+    place-items:center;
+  }
+
+  .sign-name{
+    writing-mode:vertical-rl;
+    text-orientation:upright;
+    font-size:var(--name-size,31px);
+    letter-spacing:.14em;
+    line-height:1.12;
+    color:var(--ink);
+    transition:opacity .2s linear;
+  }
+
+  .sign-name.blank{
+    color:rgba(43,38,34,.16);
+    font-size:34px;
+    letter-spacing:.2em;
+  }
+
+  .sign-desc{
+    position:absolute;
+    left:6px;right:6px;
+    bottom:20px;
+    font-size:10.5px;
+    line-height:1.7;
+    letter-spacing:.02em;
+    text-align:center;
+    text-wrap:balance;
+    color:var(--ink-soft);
+    opacity:0;
+    transition:opacity .3s var(--ease) .12s;
+  }
+
+  [data-state="result"] .sign-desc,
+  [data-state="accepted"] .sign-desc,
+  [data-state="exhausted"] .sign-desc{opacity:1}
+
+  /* 摇签动效 */
+  .sign.shuffling .sign-body{
+    animation:shuffle .5s linear infinite;
+    filter:blur(1.4px);
+  }
+  @keyframes shuffle{
+    0%{transform:translateY(-9px)}
+    50%{transform:translateY(9px)}
+    100%{transform:translateY(-9px)}
+  }
+
+  [data-state="accepted"] .sign{
+    transform:scale(1.075);
+    box-shadow:0 1px 0 rgba(255,255,255,.85) inset,
+               0 26px 44px -28px rgba(43,38,34,.6);
+  }
+
+  /* ── 印章 ─────────────────────────── */
+  .seal{
+    position:absolute;
+    right:13px;
+    bottom:58px;
+    width:30px;
+    height:30px;
+    display:grid;
+    place-items:center;
+    border:2px solid var(--seal);
+    border-radius:3px;
+    color:var(--seal);
+    font-size:17px;
+    line-height:1;
+    letter-spacing:0;
+    opacity:0;
+    transform:scale(1.7) rotate(-14deg);
+    mix-blend-mode:multiply;
+    pointer-events:none;
+  }
+
+  .seal.stamped{
+    animation:stamp .34s cubic-bezier(.2,.9,.3,1.2) forwards;
+  }
+  @keyframes stamp{
+    0%{opacity:0;transform:scale(1.7) rotate(-14deg)}
+    55%{opacity:.92;transform:scale(.94) rotate(-6deg)}
+    100%{opacity:.88;transform:scale(1) rotate(-6deg)}
+  }
+
+  /* ── 按钮 ─────────────────────────── */
+  .action-slot{
+    position:relative;
+    margin-top:clamp(18px,3.4vh,32px);
+    height:46px;
+    min-width:168px;
+    display:grid;
+    place-items:center;
+  }
+
+  .btn{
+    height:46px;
+    padding:0 30px;
+    border:0;
+    border-radius:3px;
+    background:var(--ink);
+    color:#FBF7EF;
+    font-family:inherit;
+    font-size:14.5px;
+    letter-spacing:.22em;
+    text-indent:.22em;
+    cursor:pointer;
+    transition:transform .18s var(--ease),opacity .18s var(--ease),background .18s;
+  }
+  .btn:hover:not(:disabled){transform:translateY(-1px);background:#3A342E}
+  .btn:active:not(:disabled){transform:translateY(0) scale(.99)}
+  .btn:disabled{opacity:.32;cursor:default}
+  .btn[hidden]{display:none}
+
+  .closing{
+    position:absolute;
+    inset:0;
+    margin:0;
+    display:grid;
+    place-items:center;
+    font-size:14px;
+    letter-spacing:.16em;
+    text-indent:.16em;
+    color:var(--ink);
+    opacity:0;
+    transform:translateY(4px);
+    transition:opacity .4s var(--ease) .18s,transform .4s var(--ease) .18s;
+    pointer-events:none;
+  }
+  [data-state="accepted"] .closing{opacity:1;transform:none}
+
+  [data-state="exhausted"] .action-slot{display:none}
+
+  .link{
+    margin-top:12px;
+    padding:6px 10px;
+    border:0;
+    background:none;
+    color:var(--muted);
+    font-family:inherit;
+    font-size:12.5px;
+    letter-spacing:.08em;
+    cursor:pointer;
+    border-bottom:1px solid transparent;
+    transition:color .2s,border-color .2s;
+  }
+  .link:hover{color:var(--ink-soft);border-bottom-color:var(--line)}
+  .link[hidden]{display:none}
+
+  /* ── chips ────────────────────────── */
+  .chips{
+    display:flex;
+    gap:8px;
+    margin-top:clamp(16px,3vh,26px);
+    transition:opacity .3s var(--ease),visibility .3s;
+  }
+  [data-state="accepted"] .chips,
+  [data-state="exhausted"] .chips{opacity:0;visibility:hidden;pointer-events:none}
+
+  .chip{
+    height:29px;
+    padding:0 14px;
+    border:1px solid var(--line);
+    border-radius:999px;
+    background:transparent;
+    color:var(--ink-soft);
+    font-family:inherit;
+    font-size:12.5px;
+    letter-spacing:.06em;
+    cursor:pointer;
+    transition:background .18s,border-color .18s,color .18s;
+  }
+  .chip:hover:not(:disabled){border-color:rgba(43,38,34,.3)}
+  .chip[aria-pressed="true"]{
+    background:rgba(43,38,34,.055);
+    border-color:rgba(43,38,34,.42);
+    color:var(--ink);
+  }
+  .chip:disabled{opacity:.4;cursor:default}
+
+  /* ── 提示 ─────────────────────────── */
+  .hint{
+    margin:14px 0 0;
+    min-height:1.5em;
+    font-size:11.5px;
+    letter-spacing:.02em;
+    color:var(--muted);
+    text-align:center;
+    opacity:0;
+    transition:opacity .3s var(--ease);
+  }
+  .hint.on{opacity:1}
+
+  /* ── 音效开关 ─────────────────────── */
+  .sound{
+    position:fixed;
+    right:16px;
+    bottom:14px;
+    z-index:2;
+    width:32px;
+    height:32px;
+    display:grid;
+    place-items:center;
+    border:0;
+    background:none;
+    color:var(--muted);
+    opacity:.5;
+    cursor:pointer;
+    transition:opacity .2s,color .2s;
+  }
+  .sound:hover{opacity:1;color:var(--ink-soft)}
+  .sound svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+
+  .sr-only{
+    position:absolute;
+    width:1px;height:1px;
+    padding:0;margin:-1px;
+    overflow:hidden;
+    clip:rect(0 0 0 0);
+    white-space:nowrap;
+    border:0;
+  }
+
+  /* ── 窄屏 ─────────────────────────── */
+  @media (max-width:520px){
+    :root{--sign-h:clamp(212px,44vh,320px)}
+    h1{letter-spacing:.28em;text-indent:.28em;margin-bottom:14px}
+    .action-slot{min-width:156px;height:44px}
+    .btn{height:44px}
+    .chips{gap:6px}
+    .chip{padding:0 11px;font-size:12px}
+  }
+
+  @media (max-height:640px){
+    :root{--sign-h:clamp(190px,42vh,260px)}
+    h1{margin-bottom:12px}
+    .action-slot{margin-top:14px}
+    .chips{margin-top:14px}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .sign.shuffling .sign-body{animation:none;filter:none}
+    .sign,[data-state="accepted"] .sign{transition:opacity .15s linear}
+    .closing{transition:opacity .15s linear}
+    .seal.stamped{animation:stampFlat .15s linear forwards}
+    @keyframes stampFlat{from{opacity:0}to{opacity:.88;transform:none}}
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="page" id="page" data-state="idle">
+
+    <h1>今天吃什么</h1>
+
+    <div class="sign" id="sign">
+      <div class="sign-body">
+        <div class="sign-name blank" id="signName">签</div>
+      </div>
+      <div class="sign-desc" id="signDesc"></div>
+      <div class="seal" id="seal">吃</div>
+    </div>
+
+    <div class="action-slot">
+      <button class="btn" id="primary" data-action="roll">摇一签</button>
+      <p class="closing" id="closing">就它了，去吃吧</p>
+    </div>
+
+    <button class="link" id="secondary" hidden>再摇一签</button>
+
+    <div class="chips" id="chips">
+      <button class="chip" id="chipNoSpicy" aria-pressed="false">不吃辣</button>
+      <button class="chip" id="chipGentle" aria-pressed="false">清淡点</button>
+      <button class="chip" id="chipNoodle" aria-pressed="false">想吃面</button>
+    </div>
+
+    <p class="hint" id="hint"></p>
+    <div class="sr-only" aria-live="polite" id="live"></div>
+  </div>
+</div>
+
+<button class="sound" id="sound" aria-label="音效开关" aria-pressed="false" title="音效">
+  <svg id="soundIcon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M4 9v6h4l5 4V5L8 9H4z"/>
+    <path id="waves" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>
+  </svg>
+</button>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ───────── 菜库 ───────── */
+  var DISHES = [
+    {name:"白切鸡",desc:"蘸点姜葱就够体面",tags:["荤","清淡"]},
+    {name:"香菇滑鸡",desc:"菌菇把鲜味撑得很足",tags:["荤","清淡"]},
+    {name:"冬瓜排骨汤",desc:"想喝汤的时候就是它",tags:["荤","清淡"]},
+    {name:"玉米排骨汤",desc:"清甜，不用费心调味",tags:["荤","清淡"]},
+    {name:"蒜蓉蒸排骨",desc:"上锅一蒸，等着就行",tags:["荤","清淡"]},
+    {name:"番茄牛腩",desc:"炖得越久越像家里做的",tags:["荤","清淡"]},
+    {name:"土豆炖牛肉",desc:"一锅端，饱得很实在",tags:["荤","清淡"]},
+    {name:"山药炖鸡",desc:"喝完这一碗人就缓过来了",tags:["荤","清淡"]},
+    {name:"萝卜牛腩煲",desc:"冬天里最不会后悔的选择",tags:["荤","清淡"]},
+    {name:"木须肉",desc:"肉蛋木耳一盘，营养够了",tags:["荤","清淡"]},
+    {name:"番茄炒蛋",desc:"十分钟搞定，永远的安全牌",tags:["素","清淡"]},
+    {name:"清蒸蛋羹",desc:"没胃口的晚上也不会出错",tags:["素","清淡"]},
+    {name:"蒜蓉油麦菜",desc:"三分钟出锅，清爽不占胃",tags:["素","清淡"]},
+    {name:"上汤娃娃菜",desc:"清淡里带一点鲜，很舒服",tags:["素","清淡"]},
+    {name:"香菇青菜",desc:"看着朴素，吃着顺口",tags:["素","清淡"]},
+    {name:"凉拌黄瓜",desc:"热天里最不用犹豫的一道",tags:["素","清淡"]},
+    {name:"清炒时蔬",desc:"今天想吃点绿的，就它",tags:["素","清淡"]},
+    {name:"番茄豆腐汤",desc:"酸甜开胃，配什么都行",tags:["素","清淡"]},
+    {name:"家常豆腐",desc:"煎得焦香，下饭不费劲",tags:["素","清淡"]},
+    {name:"紫菜蛋花汤",desc:"十分钟的汤，也够暖",tags:["素","清淡"]},
+    {name:"麻婆豆腐",desc:"一个人吃也不会寂寞",tags:["荤","辣"]},
+    {name:"宫保鸡丁",desc:"酸甜带辣，米饭杀手",tags:["荤","辣"]},
+    {name:"回锅肉",desc:"香得直接，适合饿狠了",tags:["荤","辣"]},
+    {name:"水煮牛肉",desc:"今天想被辣醒一次",tags:["荤","辣"]},
+    {name:"辣子鸡",desc:"越嚼越上头，停不下来",tags:["荤","辣"]},
+    {name:"鱼香肉丝",desc:"没有鱼，但很下饭",tags:["荤","辣"]},
+    {name:"小炒黄牛肉",desc:"猛火快炒，配饭刚好",tags:["荤","辣"]},
+    {name:"干锅花菜",desc:"干香带辣，下酒也下饭",tags:["荤","辣"]},
+    {name:"麻辣香锅",desc:"想吃什么都能往里加",tags:["荤","辣"]},
+    {name:"毛血旺",desc:"重口味的日子就吃它",tags:["荤","辣"]},
+    {name:"泡椒鸡杂",desc:"酸辣够劲，解腻一流",tags:["荤","辣"]},
+    {name:"香辣鸡翅",desc:"外脆里嫩，吃着有满足感",tags:["荤","辣"]},
+    {name:"农家小炒肉",desc:"简单粗暴，就是很香",tags:["荤","辣"]},
+    {name:"孜然羊肉",desc:"孜然的香气很上头",tags:["荤","辣"]},
+    {name:"干煸四季豆",desc:"干香微辣，配粥配饭都行",tags:["素","辣"]},
+    {name:"酸辣土豆丝",desc:"酸得开胃，辣得刚好",tags:["素","辣"]},
+    {name:"醋溜白菜",desc:"酸口解腻，吃多了也不腻",tags:["素","辣"]},
+    {name:"凉拌木耳",desc:"脆生生的，饭前先来一口",tags:["素","辣"]},
+    {name:"擂辣椒皮蛋",desc:"辣得直接，很有脾气",tags:["素","辣"]},
+    {name:"虎皮青椒",desc:"焦香带辣，比肉还下饭",tags:["素","辣"]},
+    {name:"手撕包菜",desc:"辣香脆爽，配什么都搭",tags:["素","辣"]},
+    {name:"清蒸鲈鱼",desc:"鱼够新鲜，清蒸最省事",tags:["荤","海鲜","清淡"]},
+    {name:"白灼虾",desc:"剥壳的动作本身就很治愈",tags:["荤","海鲜","清淡"]},
+    {name:"虾仁滑蛋",desc:"软嫩，几分钟就能上桌",tags:["荤","海鲜","清淡"]},
+    {name:"葱油花蛤",desc:"鲜得很直接，配酒最好",tags:["荤","海鲜","清淡"]},
+    {name:"蒜蓉粉丝扇贝",desc:"蒜香裹着粉丝，很满足",tags:["荤","海鲜","重口"]},
+    {name:"酸菜鱼",desc:"酸辣开胃，越吃越有胃口",tags:["荤","海鲜","辣"]},
+    {name:"剁椒鱼头",desc:"红艳艳的，很上镜也下饭",tags:["荤","海鲜","辣"]},
+    {name:"香辣虾",desc:"手上沾满汤汁才算吃过",tags:["荤","海鲜","辣"]},
+    {name:"干烧带鱼",desc:"咸香带辣，很家常的硬菜",tags:["荤","海鲜","辣"]},
+    {name:"水煮鱼",desc:"辣得痛快，适合人多时吃",tags:["荤","海鲜","辣"]},
+    {name:"小龙虾",desc:"剥壳喝酒，是一种仪式",tags:["荤","海鲜","辣"]},
+    {name:"兰州牛肉面",desc:"一碗下去，胃立刻有落",tags:["荤","面","清淡"]},
+    {name:"牛肉粉丝汤",desc:"汤热面滑，冬天首选",tags:["荤","面","清淡"]},
+    {name:"过桥米线",desc:"先喝汤，再慢慢烫料",tags:["荤","面","清淡"]},
+    {name:"冷面",desc:"冰凉的汤，第一口就醒了",tags:["荤","面","清淡"]},
+    {name:"炸酱面",desc:"拌开的那一下最香",tags:["荤","面","重口"]},
+    {name:"刀削面",desc:"面片厚实，嚼着有存在感",tags:["荤","面","重口"]},
+    {name:"牛肉拌面",desc:"拌匀了再吃，越吃越香",tags:["荤","面","重口"]},
+    {name:"豆角焖面",desc:"一锅出，连菜带主食",tags:["荤","面","重口"]},
+    {name:"阳春面",desc:"一碗清汤，什么都不用选",tags:["素","面","清淡"]},
+    {name:"西红柿鸡蛋面",desc:"家里常备的安心组合",tags:["素","面","清淡"]},
+    {name:"麻酱凉面",desc:"热天里最省事的一顿",tags:["素","面","清淡"]},
+    {name:"热干面",desc:"芝麻酱裹住每一根",tags:["素","面","重口"]},
+    {name:"葱油拌面",desc:"简单到不像菜，但很香",tags:["素","面","重口"]},
+    {name:"重庆小面",desc:"辣得清醒，适合犹豫的一天",tags:["素","面","辣"]},
+    {name:"油泼面",desc:"热油一泼，声音先馋人",tags:["素","面","辣"]},
+    {name:"螺蛳粉",desc:"闻着犹豫，吃完想念",tags:["素","面","辣"]},
+    {name:"酸辣粉",desc:"酸辣冲上来，人会醒一半",tags:["素","面","辣"]},
+    {name:"担担面",desc:"麻香在嘴里慢慢铺开",tags:["荤","面","辣"]},
+    {name:"蛋炒饭",desc:"一个人吃饭的体面方案",tags:["素","清淡"]},
+    {name:"咖喱鸡饭",desc:"浓稠的咖喱浇在饭上",tags:["荤","重口"]},
+    {name:"卤肉饭",desc:"一勺卤汁解决一碗饭",tags:["荤","重口"]},
+    {name:"黄焖鸡米饭",desc:"汤汁拌饭，比鸡还香",tags:["荤","重口"]},
+    {name:"猪脚饭",desc:"吃完很有力气的一顿",tags:["荤","重口"]},
+    {name:"煲仔饭",desc:"等锅巴形成的那几分钟很值",tags:["荤","重口"]},
+    {name:"石锅拌饭",desc:"拌开时锅底还在响",tags:["素","辣"]},
+    {name:"红烧肉",desc:"馋了就该吃，别忍着",tags:["荤","重口"]},
+    {name:"糖醋排骨",desc:"酸甜的，心情差时特别管用",tags:["荤","重口"]},
+    {name:"京酱肉丝",desc:"拿生菜卷着吃，很有仪式感",tags:["荤","重口"]},
+    {name:"三杯鸡",desc:"酱香浓，配白饭刚好",tags:["荤","重口"]},
+    {name:"可乐鸡翅",desc:"甜口的稳妥牌，不会踩雷",tags:["荤","重口"]},
+    {name:"蒜香排骨",desc:"蒜味很足，手上会留香",tags:["荤","重口"]},
+    {name:"梅菜扣肉",desc:"咸香软糯，一筷子就下去了",tags:["荤","重口"]},
+    {name:"糖醋里脊",desc:"外酥里嫩，小孩大人都抢",tags:["荤","重口"]},
+    {name:"蚂蚁上树",desc:"粉丝吸饱了汤汁，很下饭",tags:["荤","辣"]},
+    {name:"酸汤肥牛",desc:"酸得开胃，牛肉也够嫩",tags:["荤","辣"]},
+    {name:"铁板豆腐",desc:"外焦里嫩，滋滋响很解压",tags:["素","辣"]},
+    {name:"干锅土豆片",desc:"焦香带辣，越吃越想吃",tags:["素","辣"]},
+    {name:"鱼香茄子",desc:"软糯入味，饭要多半碗",tags:["素","辣"]},
+    {name:"清炒藕片",desc:"脆的，咬下去有声音",tags:["素","清淡"]},
+    {name:"红烧茄子",desc:"油润柔软，很治愈",tags:["素","重口"]},
+    {name:"蒜蓉西兰花",desc:"清爽不寡淡，吃完不撑",tags:["素","清淡"]},
+    {name:"韭菜炒鸡蛋",desc:"几分钟就好的家常味道",tags:["素","清淡"]},
+    {name:"西葫芦炒蛋",desc:"清淡里带点甜，很温和",tags:["素","清淡"]},
+    {name:"蒸南瓜",desc:"甜的，不用加任何调料",tags:["素","清淡"]},
+    {name:"凉拌海带丝",desc:"酸辣脆爽，解腻很有效",tags:["素","辣"]},
+    {name:"蚝油生菜",desc:"一分钟出锅，清清爽爽",tags:["素","清淡"]},
+    {name:"皮蛋豆腐",desc:"冷盘里的安全牌，配粥也好",tags:["素","清淡"]},
+    {name:"拌菠菜",desc:"焯一下拌开，涩味全没了",tags:["素","清淡"]}
+  ];
+
+  /* ───────── 元素 ───────── */
+  var page      = document.getElementById("page");
+  var sign      = document.getElementById("sign");
+  var nameEl    = document.getElementById("signName");
+  var descEl    = document.getElementById("signDesc");
+  var sealEl    = document.getElementById("seal");
+  var primary   = document.getElementById("primary");
+  var closing   = document.getElementById("closing");
+  var secondary = document.getElementById("secondary");
+  var chips     = document.getElementById("chips");
+  var chipNoSpicy = document.getElementById("chipNoSpicy");
+  var chipGentle  = document.getElementById("chipGentle");
+  var chipNoodle  = document.getElementById("chipNoodle");
+  var hintEl    = document.getElementById("hint");
+  var liveEl    = document.getElementById("live");
+  var soundBtn  = document.getElementById("sound");
+  var wavesEl   = document.getElementById("waves");
+
+  /* ───────── 存储 ───────── */
+  function read(k, fallback){
+    try{
+      var v = localStorage.getItem(k);
+      return v === null ? fallback : JSON.parse(v);
+    }catch(e){ return fallback; }
+  }
+  function write(k, v){
+    try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){}
+  }
+
+  var S = {
+    state: "idle",
+    dish: null,
+    gentle: false,
+    noodle: false,
+    noSpicy: read("jtsmc.noSpicy", false) === true,
+    muted: read("jtsmc.muted", false) === true,
+    rolled: [],
+    undone: read("jtsmc.undone", []) || [],
+    outletUsed: false,
+    relaxMsg: ""
+  };
+
+  /* 逻辑日期：凌晨 4 点翻篇 */
+  function logicalDay(){
+    var d = new Date(Date.now() - 4 * 3600 * 1000);
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+
+  function syncDay(){
+    var today = logicalDay();
+    if (read("jtsmc.date", "") !== today){
+      write("jtsmc.date", today);
+      write("jtsmc.rolled", []);
+      write("jtsmc.undone", []);
+      S.rolled = [];
+      S.undone = [];
+      S.outletUsed = false;
+    } else {
+      S.rolled = read("jtsmc.rolled", []) || [];
+      S.undone = read("jtsmc.undone", []) || [];
+    }
+  }
+
+  /* ───────── 音效（Web Audio 合成） ───────── */
+  var ac = null;
+  var active = [];
+
+  function audio(){
+    if (!ac){
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      try{ ac = new Ctx(); }catch(e){ return null; }
+    }
+    if (ac.state === "suspended"){ ac.resume().catch(function(){}); }
+    return ac;
+  }
+
+  var noiseBuf = null;
+  function noise(ctx){
+    if (noiseBuf && noiseBuf.sampleRate === ctx.sampleRate) return noiseBuf;
+    var len = Math.floor(ctx.sampleRate * 1.2);
+    var buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    var data = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    noiseBuf = buf;
+    return buf;
+  }
+
+  var MASTER = 0.18;
+
+  function track(node){ active.push(node); }
+
+  function playShake(dur){
+    if (S.muted) return;
+    var ctx = audio(); if (!ctx) return;
+    var t0 = ctx.currentTime;
+    var sec = dur / 1000;
+
+    var src = ctx.createBufferSource();
+    src.buffer = noise(ctx);
+    var bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 2800;
+    bp.Q.value = 0.9;
+    var g = ctx.createGain();
+    var ts = t0;
+
+    g.gain.setValueAtTime(0, ts);
+    g.gain.linearRampToValueAtTime(MASTER, ts + 0.02);
+
+    /* 签条互撞：随机起伏 */
+    var steps = Math.max(4, Math.round(sec / 0.075));
+    for (var i = 1; i < steps; i++){
+      var t = ts + (sec * i / steps);
+      g.gain.linearRampToValueAtTime(MASTER * (0.55 + Math.random() * 0.8), t);
+    }
+    g.gain.linearRampToValueAtTime(MASTER * 0.9, ts + Math.max(0.06, sec - 0.09));
+    g.gain.linearRampToValueAtTime(0, ts + sec);
+
+    src.connect(bp); bp.connect(g); g.connect(ctx.destination);
+    src.start(t0); src.stop(t0 + sec + 0.05);
+    track(src);
+  }
+
+  function thud(fromHz, toHz, dur, level, noiseLevel){
+    if (S.muted) return;
+    var ctx = audio(); if (!ctx) return;
+    var t0 = ctx.currentTime;
+
+    var osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(fromHz, t0);
+    osc.frequency.exponentialRampToValueAtTime(toHz, t0 + dur);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(level, t0 + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0008, t0 + dur);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(t0); osc.stop(t0 + dur + 0.02);
+    track(osc);
+
+    if (noiseLevel){
+      var src = ctx.createBufferSource();
+      src.buffer = noise(ctx);
+      var hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 1400;
+      var ng = ctx.createGain();
+      ng.gain.setValueAtTime(noiseLevel, t0);
+      ng.gain.exponentialRampToValueAtTime(0.0008, t0 + 0.045);
+      src.connect(hp); hp.connect(ng); ng.connect(ctx.destination);
+      src.start(t0); src.stop(t0 + 0.06);
+      track(src);
+    }
+  }
+
+  function playSettle(){ thud(120, 68, 0.14, MASTER * 0.55, MASTER * 0.18); }
+  function playStamp(){ thud(88, 46, 0.22, MASTER * 0.9, MASTER * 0.4); }
+
+  /* chip 的轻响：选中偏高偏亮，取消偏低带下滑，模拟"嗒"与"嗒——" */
+  function playTick(isOn){
+    if (S.muted) return;
+    var ctx = audio(); if (!ctx) return;
+    var t0 = ctx.currentTime;
+    var dur = isOn ? 0.055 : 0.085;
+
+    var osc = ctx.createOscillator();
+    osc.type = "triangle";
+    if (isOn){
+      osc.frequency.setValueAtTime(1245, t0);
+    } else {
+      osc.frequency.setValueAtTime(920, t0);
+      osc.frequency.exponentialRampToValueAtTime(620, t0 + dur);
+    }
+
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(MASTER * 0.16, t0 + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0006, t0 + dur);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(t0); osc.stop(t0 + dur + 0.02);
+    track(osc);
+
+    /* 纸片/指尖的质感：极短高频噪声 */
+    var src = ctx.createBufferSource();
+    src.buffer = noise(ctx);
+    var hp = ctx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 3200;
+    var ng = ctx.createGain();
+    ng.gain.setValueAtTime(MASTER * 0.10, t0);
+    ng.gain.exponentialRampToValueAtTime(0.0005, t0 + 0.012);
+    src.connect(hp); hp.connect(ng); ng.connect(ctx.destination);
+    src.start(t0); src.stop(t0 + 0.02);
+    track(src);
+  }
+
+  function silence(){
+    active.forEach(function(n){ try{ n.stop(0); }catch(e){} });
+    active = [];
+  }
+
+  /* ───────── 选择逻辑 ───────── */
+  function match(d, noSpicy, gentle, noodle){
+    var t = d.tags;
+    if (noSpicy && t.indexOf("辣") > -1) return false;
+    if (gentle && t.indexOf("清淡") < 0) return false;
+    if (noodle && t.indexOf("面") < 0) return false;
+    return true;
+  }
+
+  /* 条件让步：先放「想吃面」，再放「清淡点」，硬忌口永不放宽 */
+  function candidates(){
+    var gentle = S.gentle, noodle = S.noodle, msg = "";
+    var pool = DISHES.filter(function(d){ return match(d, S.noSpicy, gentle, noodle); });
+
+    if (!pool.length && noodle){
+      noodle = false;
+      pool = DISHES.filter(function(d){ return match(d, S.noSpicy, gentle, noodle); });
+      msg = "没有完全符合的，帮你放开了「想吃面」";
+    }
+    if (!pool.length && gentle){
+      gentle = false;
+      pool = DISHES.filter(function(d){ return match(d, S.noSpicy, gentle, noodle); });
+      msg = "没有完全符合的，帮你放开了「清淡点」";
+    }
+    return { pool: pool, msg: msg };
+  }
+
+  function remaining(pool, ignoreRolled){
+    if (ignoreRolled) return pool.slice();
+    return pool.filter(function(d){ return S.rolled.indexOf(d.name) < 0; });
+  }
+
+  function pick(list){
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
+  /* ───────── 渲染 ───────── */
+  function setState(s){
+    S.state = s;
+    page.setAttribute("data-state", s);
+  }
+
+  function setHint(text){
+    hintEl.textContent = text || "";
+    hintEl.classList.toggle("on", !!text);
+  }
+
+  /* 字号按签的实际高度算，保证任何尺寸下都不压到下方的说明 */
+  function sizeName(name){
+    var h = sign.clientHeight || 300;
+    var avail = Math.max(96, h - 74);
+    var size = Math.min(31, avail / (Math.max(2, name.length) * 1.14));
+    size = Math.max(15, size);
+    nameEl.style.setProperty("--name-size", Math.round(size) + "px");
+  }
+
+  function showDish(d){
+    nameEl.textContent = d.name;
+    nameEl.classList.remove("blank");
+    descEl.textContent = d.desc;
+    sizeName(d.name);
+  }
+
+  function showBlank(){
+    nameEl.textContent = "签";
+    nameEl.classList.add("blank");
+    nameEl.style.removeProperty("--name-size");
+    descEl.textContent = "";
+  }
+
+  function toIdle(){
+    setState("idle");
+    showBlank();
+    sealEl.classList.remove("stamped");
+    primary.hidden = false;
+    primary.disabled = false;
+    primary.textContent = "摇一签";
+    primary.dataset.action = "roll";
+    secondary.hidden = true;
+    setHint("");
+    setChipsDisabled(false);
+    S.dish = null;
+    S.relaxMsg = "";
+  }
+
+  function toResult(d, msg){
+    setState("result");
+    S.dish = d;
+    S.relaxMsg = msg || "";
+    showDish(d);
+    sealEl.classList.remove("stamped");
+    primary.hidden = false;
+    primary.disabled = false;
+    primary.textContent = "就吃这个";
+    primary.dataset.action = "accept";
+    secondary.hidden = false;
+    secondary.textContent = "再摇一签";
+    secondary.dataset.action = "roll";
+    setHint(msg);
+    setChipsDisabled(false);
+    liveEl.textContent = "今天吃 " + d.name;
+  }
+
+  function toAccepted(){
+    setState("accepted");
+    primary.hidden = true;
+    sealEl.classList.remove("stamped");
+    void sealEl.offsetWidth;
+    sealEl.classList.add("stamped");
+    secondary.hidden = S.undone.indexOf(S.dish.name) > -1;
+    secondary.textContent = "再想想";
+    secondary.dataset.action = "undo";
+    setChipsDisabled(true);
+    liveEl.textContent = "就吃 " + S.dish.name;
+    playStamp();
+  }
+
+  function toExhausted(){
+    setState("exhausted");
+    nameEl.textContent = "今日签已尽";
+    nameEl.classList.remove("blank");
+    sizeName("今日签已尽");
+    descEl.textContent = "明天再来";
+    sealEl.classList.remove("stamped");
+    primary.hidden = true;
+    secondary.hidden = false;
+    secondary.textContent = "不管了，随机来一个";
+    secondary.dataset.action = "outlet";
+    setHint("");
+    setChipsDisabled(false);
+    liveEl.textContent = "今日签已尽";
+  }
+
+  function setChipsDisabled(v){
+    [chipNoSpicy, chipGentle, chipNoodle].forEach(function(c){ c.disabled = v; });
+  }
+
+  function syncChips(){
+    chipNoSpicy.setAttribute("aria-pressed", String(S.noSpicy));
+    chipGentle.setAttribute("aria-pressed", String(S.gentle));
+    chipNoodle.setAttribute("aria-pressed", String(S.noodle));
+  }
+
+  function syncSound(){
+    soundBtn.setAttribute("aria-pressed", String(S.muted));
+    soundBtn.setAttribute("aria-label", S.muted ? "打开音效" : "静音");
+    wavesEl.style.opacity = S.muted ? "0" : "1";
+  }
+
+  /* ───────── 摇签 ───────── */
+  var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var rolling = false;
+
+  function roll(ignoreRolled){
+    if (rolling) return;
+    rolling = true;
+
+    var c = candidates();
+    var pool = c.pool;
+    var list = remaining(pool, ignoreRolled);
+
+    if (!list.length){
+      rolling = false;
+      toExhausted();
+      return;
+    }
+
+    setState("rolling");
+    setHint("");
+    primary.disabled = true;
+    secondary.hidden = true;
+    setChipsDisabled(true);
+    sealEl.classList.remove("stamped");
+
+    var dur = reduced ? 150 : 500 + Math.round(Math.random() * 300);
+    if (!reduced) sign.classList.add("shuffling");
+    playShake(dur);
+
+    var spinPool = pool.length ? pool : DISHES;
+    var timer = setInterval(function(){
+      showDish(spinPool[Math.floor(Math.random() * spinPool.length)]);
+    }, 70);
+
+    setTimeout(function(){
+      clearInterval(timer);
+      sign.classList.remove("shuffling");
+
+      var d = pick(list);
+      S.rolled.push(d.name);
+      write("jtsmc.rolled", S.rolled);
+
+      rolling = false;
+      playSettle();
+      toResult(d, c.msg);
+    }, dur);
+  }
+
+  function accept(){
+    if (S.state !== "result" || !S.dish) return;
+    toAccepted();
+  }
+
+  /* 撤销：仅一次，且该菜仍留在当日记录里 */
+  function undo(){
+    if (S.state !== "accepted" || !S.dish) return;
+    if (S.undone.indexOf(S.dish.name) < 0){
+      S.undone.push(S.dish.name);
+      write("jtsmc.undone", S.undone);
+    }
+    sealEl.classList.remove("stamped");
+    setState("result");
+    showDish(S.dish);
+    setHint(S.relaxMsg);
+    primary.hidden = false;
+    primary.disabled = false;
+    primary.textContent = "就吃这个";
+    primary.dataset.action = "accept";
+    /* 撤销已用过，次要操作只剩「再摇一签」 */
+    secondary.hidden = false;
+    secondary.textContent = "再摇一签";
+    secondary.dataset.action = "roll";
+    setChipsDisabled(false);
+    liveEl.textContent = "今天吃 " + S.dish.name;
+  }
+
+  /* ───────── 事件 ───────── */
+  primary.addEventListener("click", function(){
+    var a = primary.dataset.action;
+    if (a === "accept") accept();
+    else if (a === "roll") roll(false);
+  });
+
+  secondary.addEventListener("click", function(){
+    var a = secondary.dataset.action;
+    if (a === "undo") undo();
+    else if (a === "outlet"){
+      if (S.outletUsed) return;
+      S.outletUsed = true;
+      roll(true);
+    }
+    else roll(false);
+  });
+
+  /* 结果 / 签尽状态下改条件：作废当前画面，回到待摇，不自动重摇 */
+  function afterChipChange(){
+    if (S.state === "result" || S.state === "exhausted") toIdle();
+  }
+
+  chipNoSpicy.addEventListener("click", function(){
+    if (rolling) return;
+    S.noSpicy = !S.noSpicy;
+    write("jtsmc.noSpicy", S.noSpicy);
+    syncChips();
+    playTick(S.noSpicy);
+    afterChipChange();
+  });
+
+  chipGentle.addEventListener("click", function(){
+    if (rolling) return;
+    S.gentle = !S.gentle;
+    syncChips();
+    playTick(S.gentle);
+    afterChipChange();
+  });
+
+  chipNoodle.addEventListener("click", function(){
+    if (rolling) return;
+    S.noodle = !S.noodle;
+    syncChips();
+    playTick(S.noodle);
+    afterChipChange();
+  });
+
+  soundBtn.addEventListener("click", function(){
+    S.muted = !S.muted;
+    write("jtsmc.muted", S.muted);
+    if (S.muted) silence();
+    syncSound();
+    if (!S.muted) playSettle();
+  });
+
+  /* ───────── 启动 ───────── */
+  window.addEventListener("resize", function(){
+    if (S.dish && (S.state === "result" || S.state === "accepted")) sizeName(S.dish.name);
+    if (S.state === "exhausted") sizeName("今日签已尽");
+  });
+
+  syncDay();
+  syncChips();
+  syncSound();
+  toIdle();
+})();
+</script>
+</body>
+</html>
