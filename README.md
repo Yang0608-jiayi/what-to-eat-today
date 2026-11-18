@@ -25,12 +25,39 @@
 ```powershell
 git add index.html dishes.md PRD.md README.md tools/validate.mjs
 git commit -m "v3: 新增排除法玩法 + 底部玩法切换"
+git tag -a v3.0 -m "v3.0 新增排除法玩法"
 git push
+git push origin v3.0
 ```
 
 然后在 Gitee 仓库页 → 服务 → **Gitee Pages** → 部署分支选 `main`、部署目录留空 → 启动。
 
 Gitee Pages **不会自动重新部署**，每次推送后需要回仓库页点一次「更新」，否则线上还是旧版本。
+
+## 版本标签
+
+每次推代码都给这一次打一个**附注标签**，格式 `vX.Y`（与 PRD 的版本号、提交信息里的 `vX` 对齐），方便以后按标签回看任意一版：
+
+```powershell
+git add index.html PRD.md README.md
+git commit -m "v4: 一句话说明这一版改了什么"
+git tag -a v4.0 -m "v4.0 一句话说明"
+git push
+git push origin v4.0      # 标签不会跟着 git push 自动走，要单独推
+```
+
+- 功能版本用 `vX.0`；只改文档 / 文案这类小改动用 `vX.Y`（如 `v3.1`）。
+- 标签必须是**附注标签**（带 `-a`），这样 `git show v3.0` 能看到这一版改了什么。
+- 打错了可以删掉重打：`git tag -d v3.1` + `git push origin :refs/tags/v3.1`。
+
+已发布的标签：
+
+| 标签 | 内容 |
+|---|---|
+| `v1.0` | 基础版：摇一签、100 道菜 |
+| `v2.0` | 180 道菜、长按换方向、触觉反馈、动效升级、接受后复制 |
+| `v3.0` | 排除法玩法、底部悬浮导航切换 |
+| `v3.1` | 文档：补充版本标签约定 |
 
 ## 本地预览
 
