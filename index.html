@@ -77,7 +77,7 @@
     min-height:100svh;
     display:grid;
     place-items:center;
-    padding:clamp(16px,3.4vh,40px) 20px calc(104px + env(safe-area-inset-bottom));
+    padding:clamp(16px,3.4vh,40px) 20px calc(20px + env(safe-area-inset-bottom));
   }
 
   .page{
@@ -612,21 +612,25 @@
   }
 
   /* ── 玩法切换 ─────────────────────── */
+  /* 顶部功能行：导航居中、音效靠右。页面本身不滚动，所以不需要固定定位，
+     进文档流的好处是导航永远跟着内容居中，不会在大屏上与内容拉出一道空白 */
+  .topbar{
+    position:relative;
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-bottom:14px;
+  }
+
   .switch{
-    position:fixed;
-    left:50%;
-    bottom:calc(26px + env(safe-area-inset-bottom));
-    transform:translateX(-50%);
-    z-index:3;
     display:flex;
     gap:2px;
     padding:3px;
-    border:1px solid rgba(100,108,80,.2);
+    border:1px solid rgba(100,108,80,.22);
     border-radius:999px;
-    background:rgba(255,253,249,.82);
-    -webkit-backdrop-filter:blur(8px);
-    backdrop-filter:blur(8px);
-    box-shadow:0 14px 30px -22px rgba(43,38,34,.55);
+    background:var(--paper-hi);
+    box-shadow:0 10px 24px -22px rgba(43,38,34,.5);
   }
   .switch button{
     height:31px;
@@ -648,10 +652,10 @@
 
   /* ── 音效开关 ─────────────────────── */
   .sound{
-    position:fixed;
-    right:16px;
-    bottom:calc(26px + env(safe-area-inset-bottom));
-    z-index:2;
+    position:absolute;
+    right:0;
+    top:50%;
+    margin-top:-16px;
     width:32px;
     height:32px;
     display:grid;
@@ -690,6 +694,7 @@
 
   @media (max-height:640px){
     :root{--sign-h:clamp(190px,42vh,260px);--card-h:clamp(70px,11.2vh,86px);--arena-h:clamp(104px,17vh,128px)}
+    .topbar{margin-bottom:12px}
     h1{margin-bottom:12px}
     .action-slot{margin-top:14px}
     .chips{margin-top:14px}
@@ -716,6 +721,20 @@
 
 <div class="stage">
   <div class="page" id="page">
+
+    <div class="topbar">
+      <nav class="switch" role="tablist" aria-label="玩法切换">
+        <button role="tab" id="tabSign" aria-selected="true" aria-controls="viewSign">摇一签</button>
+        <button role="tab" id="tabElim" aria-selected="false" aria-controls="viewElim">排除法</button>
+        <button role="tab" id="tabPk" aria-selected="false" aria-controls="viewPk">守擂</button>
+      </nav>
+      <button class="sound" id="sound" aria-label="音效开关" aria-pressed="false" title="音效">
+        <svg id="soundIcon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 9v6h4l5 4V5L8 9H4z"/>
+          <path id="waves" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>
+        </svg>
+      </button>
+    </div>
 
     <h1>今天吃什么</h1>
 
@@ -794,19 +813,6 @@
     <div class="sr-only" aria-live="polite" id="live"></div>
   </div>
 </div>
-
-<nav class="switch" role="tablist" aria-label="玩法切换">
-  <button role="tab" id="tabSign" aria-selected="true" aria-controls="viewSign">摇一签</button>
-  <button role="tab" id="tabElim" aria-selected="false" aria-controls="viewElim">排除法</button>
-  <button role="tab" id="tabPk" aria-selected="false" aria-controls="viewPk">守擂</button>
-</nav>
-
-<button class="sound" id="sound" aria-label="音效开关" aria-pressed="false" title="音效">
-  <svg id="soundIcon" viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M4 9v6h4l5 4V5L8 9H4z"/>
-    <path id="waves" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>
-  </svg>
-</button>
 
 <script>
 (function(){
