@@ -425,7 +425,7 @@
   }
   .hint.on{opacity:1}
 
-  /* ── 玩法二：排除法 ───────────────── */
+  /* ── 玩法二：划掉 ─────────────────── */
   .elim-lead,
   .pk-lead{
     margin:-8px 0 14px;
@@ -587,7 +587,7 @@
     text-align:center;
   }
 
-  /* ── 玩法三：守擂 ─────────────────── */
+  /* ── 玩法三：二选一 ───────────────── */
   .cards.duel{
     display:grid;
     grid-template-columns:1fr auto 1fr;
@@ -769,8 +769,8 @@
 
     <nav class="switch" role="tablist" aria-label="玩法切换">
       <button role="tab" id="tabSign" aria-selected="true" aria-controls="viewSign">摇一签</button>
-      <button role="tab" id="tabElim" aria-selected="false" aria-controls="viewElim">排除法</button>
-      <button role="tab" id="tabPk" aria-selected="false" aria-controls="viewPk">守擂</button>
+      <button role="tab" id="tabElim" aria-selected="false" aria-controls="viewElim">划掉</button>
+      <button role="tab" id="tabPk" aria-selected="false" aria-controls="viewPk">二选一</button>
     </nav>
 
     <div class="view view-sign" id="viewSign" data-state="idle" role="tabpanel" aria-labelledby="tabSign">
@@ -809,7 +809,7 @@
 
     <div class="view view-elim" id="viewElim" data-state="pick" role="tabpanel" aria-labelledby="tabElim" hidden>
 
-      <p class="elim-lead">点掉不想吃的，剩一个就是答案</p>
+      <p class="elim-lead">划掉不想吃的，剩一个就是答案</p>
 
       <div class="cards" id="cards"></div>
 
@@ -1148,7 +1148,7 @@
     relaxMsg: ""
   };
 
-  /* 排除法自己的会话状态，不持久化 */
+  /* 划掉自己的会话状态，不持久化 */
   var E = {
     state: "pick",
     cards: [],
@@ -1156,7 +1156,7 @@
     seen: []
   };
 
-  /* 守擂自己的会话状态，不持久化 */
+  /* 二选一自己的会话状态，不持久化 */
   var P = {
     state: "face",
     champion: null,
@@ -1225,36 +1225,112 @@
 
   function track(node){ active.push(node); }
 
-  function playShake(dur){
+  /* 收音机故障的"呲呲"：只把滤波器调窄仍然是沙沙，三样缺一不可——
+     ① 断续门（偶尔掉到近静音）② 扫频带通（像在调台）③ 静电噼啪（短脉冲）
+     ④ 偶发差拍"嘀"（串台的来源），音量极低，听清就过了 */
+  function playStatic(sec, intensity){
     if (S.muted) return;
     var ctx = audio(); if (!ctx) return;
+    var amt = typeof intensity === "number" ? intensity : 1;
     var t0 = ctx.currentTime;
-    var sec = dur / 1000;
+    var end = t0 + sec;
+    var fade = Math.min(0.06, sec * 0.3);
 
-    var src = ctx.createBufferSource();
-    src.buffer = noise(ctx);
-    var bp = ctx.createBiquadFilter();
-    bp.type = "bandpass";
-    bp.frequency.value = 2800;
-    bp.Q.value = 0.9;
-    var g = ctx.createGain();
-    var ts = t0;
+    /* 总出口：高频多了刺耳，砍在 6.8k；低频轰鸣也一并去掉 */
+    var lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 6800;
+    lp.connect(ctx.destination);
 
-    g.gain.setValueAtTime(0, ts);
-    g.gain.linearRampToValueAtTime(MASTER, ts + 0.02);
-
-    /* 签条互撞：随机起伏 */
-    var steps = Math.max(4, Math.round(sec / 0.075));
-    for (var i = 1; i < steps; i++){
-      var t = ts + (sec * i / steps);
-      g.gain.linearRampToValueAtTime(MASTER * (0.55 + Math.random() * 0.8), t);
+    /* ① 断续门：收音机最标志的是"呲——呲呲—呲"的不规则空档 */
+    var gate = ctx.createGain();
+    gate.connect(lp);
+    gate.gain.setValueAtTime(0, t0);
+    gate.gain.linearRampToValueAtTime(0.85, t0 + 0.02);
+    var t = t0 + 0.02;
+    while (t < end - fade){
+      var lvl = Math.random() < 0.18 ? 0.12 : 0.7 + Math.random() * 0.45;
+      gate.gain.linearRampToValueAtTime(lvl, Math.min(t + 0.006, end - fade));
+      t += 0.03 + Math.random() * 0.06;
     }
-    g.gain.linearRampToValueAtTime(MASTER * 0.9, ts + Math.max(0.06, sec - 0.09));
-    g.gain.linearRampToValueAtTime(0, ts + sec);
+    gate.gain.linearRampToValueAtTime(0, end);
 
-    src.connect(bp); bp.connect(g); g.connect(ctx.destination);
-    src.start(t0); src.stop(t0 + sec + 0.05);
-    track(src);
+    /* 底噪：宽一点，负责"电流"那一层 */
+    var bed = ctx.createBufferSource();
+    bed.buffer = noise(ctx);
+    var bedHp = ctx.createBiquadFilter();
+    bedHp.type = "highpass";
+    bedHp.frequency.value = 600;
+    var bedBp = ctx.createBiquadFilter();
+    bedBp.type = "bandpass";
+    bedBp.frequency.value = 1900;
+    bedBp.Q.value = 0.9;
+    var bedGain = ctx.createGain();
+    bedGain.gain.value = MASTER * 0.35 * amt;
+    bed.connect(bedHp); bedHp.connect(bedBp); bedBp.connect(bedGain); bedGain.connect(gate);
+    bed.start(t0, Math.random() * 0.2); bed.stop(end + 0.02);
+    track(bed);
+
+    /* 扫频：窄带通的中心随机跳，听感就是"频道在漂" */
+    var sweep = ctx.createBufferSource();
+    sweep.buffer = noise(ctx);
+    var sweepBp = ctx.createBiquadFilter();
+    sweepBp.type = "bandpass";
+    sweepBp.Q.value = 9;
+    var sweepGain = ctx.createGain();
+    sweepGain.gain.value = MASTER * 0.5 * amt;
+    sweep.connect(sweepBp); sweepBp.connect(sweepGain); sweepGain.connect(gate);
+    var sf = t0;
+    while (sf < end - fade){
+      sweepBp.frequency.setValueAtTime(700 + Math.random() * 2900, sf);
+      sf += 0.055 + Math.random() * 0.035;
+    }
+    sweep.start(t0, Math.random() * 0.2); sweep.stop(end + 0.02);
+    track(sweep);
+
+    /* ③ 静电噼啪：矩形包络的短脉冲，这才是"呲"字本身
+       时长按秒数推脉冲数，reduced-motion 的短促一发也走同一条路径 */
+    var pops = Math.min(12, Math.max(1, Math.round(sec * 16 + Math.random() * 3)));
+    var pop = ctx.createBufferSource();
+    pop.buffer = noise(ctx);
+    var popHp = ctx.createBiquadFilter();
+    popHp.type = "highpass";
+    popHp.frequency.value = 2600;
+    var popGain = ctx.createGain();
+    popGain.gain.setValueAtTime(0, t0);
+    var last = 0;
+    for (var p = 0; p < pops; p++){
+      var pt = 0.03 + Math.random() * Math.max(0.02, sec - 0.06);
+      if (pt < last + 0.025) pt = last + 0.025;
+      var len = Math.min(0.005 + Math.random() * 0.009, sec - pt - 0.005);
+      if (len < 0.003) break;
+      popGain.gain.setValueAtTime(0, t0 + pt);
+      popGain.gain.linearRampToValueAtTime(MASTER * (0.35 + Math.random() * 0.25) * amt, t0 + pt + 0.0007);
+      popGain.gain.linearRampToValueAtTime(0, t0 + pt + len);
+      last = pt;
+    }
+    pop.connect(popHp); popHp.connect(popGain); popGain.connect(lp);
+    pop.start(t0, Math.random() * 0.3); pop.stop(end + 0.02);
+    track(pop);
+
+    /* ④ 差拍"嘀"：一到两次，轻到像串台 */
+    var chirps = sec > 0.3 ? 1 + (Math.random() < 0.45 ? 1 : 0) : 0;
+    for (var c = 0; c < chirps; c++){
+      var ct = t0 + 0.06 + Math.random() * Math.max(0.05, sec - 0.25);
+      var cd = 0.08 + Math.random() * 0.06;
+      var f0 = 900 + Math.random() * 700;
+      var osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(f0, ct);
+      osc.frequency.linearRampToValueAtTime(f0 * 0.97, ct + cd);
+      var og = ctx.createGain();
+      og.gain.setValueAtTime(0, ct);
+      og.gain.linearRampToValueAtTime(MASTER * 0.07 * amt, ct + 0.02);
+      og.gain.linearRampToValueAtTime(0, ct + cd);
+      osc.connect(og); og.connect(gate);
+      osc.start(ct); osc.stop(ct + cd + 0.02);
+      track(osc);
+    }
   }
 
   function thud(fromHz, toHz, dur, level, noiseLevel){
@@ -1717,7 +1793,8 @@
 
     var dur = reduced ? 150 : 500 + Math.round(Math.random() * 300);
     if (!reduced) sign.classList.add("shuffling");
-    playShake(dur);
+    /* 声音比动效早约 25ms 收尾，最后那一下留给落定的"咚" */
+    playStatic(reduced ? 0.09 : Math.max(0.16, dur / 1000 - 0.025), 1);
 
     var spinPool = pool.length ? pool : DISHES;
     var timer = setInterval(function(){
@@ -1771,7 +1848,7 @@
     liveEl.textContent = "今天吃 " + S.dish.name;
   }
 
-  /* ───────── 玩法二：排除法 ───────── */
+  /* ───────── 玩法二：划掉 ──────────── */
   var CARD_COUNT = 6;
   var FLAVORS = ["辣", "清淡", "重口"];
   var KINDS = ["荤", "素"];
@@ -2017,7 +2094,7 @@
     }
     if (!item) return;
 
-    /* 最后一张不能排除 */
+    /* 最后一张不能划掉 */
     if (!item.off && aliveCards().length <= 1){
       denyCard(name);
       setHint("总得留一个");
@@ -2038,7 +2115,7 @@
 
     var alive = aliveCards();
     if (alive.length === 1){
-      /* 排到只剩一张，直接定格 */
+      /* 划到只剩一张，直接定格 */
       elimPin(alive[0].d);
       return;
     }
@@ -2072,7 +2149,8 @@
       }, step * i);
     });
 
-    playShake(reduced ? 150 : 480);
+    /* 抽牌用同一套收音机故障音，轻一档，不抢摇签的主角 */
+    playStatic(reduced ? 0.09 : 0.455, 0.6);
 
     setTimeout(function(){
       drawing = false;
@@ -2091,7 +2169,7 @@
 
   function elimBack(){
     if (E.state === "result"){
-      /* 回到六张牌，保留排除状态；赢家自动回到未排除 */
+      /* 回到六张牌，保留划掉状态；赢家自动回到未划掉 */
       E.winner = null;
       setEstate("pick");
       renderCards();
@@ -2110,7 +2188,7 @@
     }
   }
 
-  /* ───────── 玩法三：守擂 ───────── */
+  /* ───────── 玩法三：二选一 ───────── */
   /* 一场最多看几道菜：到顶后不再换牌，最后两张必须点一个结束 */
   var PK_MAX_DISHES = 5;
 
@@ -2133,7 +2211,7 @@
     });
   }
 
-  /* 挑战者逐级放宽：方向相反 → 味道相反 → 荤素相反 → 任意 */
+  /* 新换上来的那张逐级放宽：方向相反 → 味道相反 → 荤素相反 → 任意 */
   function pkChallenger(hero){
     var base = pkAvailable();
     if (!base.length) return null;
@@ -2207,7 +2285,7 @@
     if (P.state === "face"){
       if (P.final){
         pkLead.textContent = P.challenger ? "最后两道，选一个就结束" : "就剩它了，点一下";
-        pkCount.textContent = n ? "已淘汰 " + n + " 道" : "";
+        pkCount.textContent = n ? "已换掉 " + n + " 道" : "";
       } else {
         pkLead.textContent = "点你想留的那个，另一个换掉";
         pkCount.textContent = "还能换 " + Math.max(0, PK_MAX_DISHES - P.seen.length) + " 次";
@@ -2267,7 +2345,7 @@
     if (S.view === "pk") announceDuel();
   }
 
-  /* 补一张挑战者；补完到顶就进决赛态 */
+  /* 补一张新牌；补完到顶就进决赛态 */
   function pkNextChallenger(){
     if (P.seen.length >= PK_MAX_DISHES){
       P.challenger = null;
@@ -2279,7 +2357,7 @@
     P.final = !P.challenger || P.seen.length >= PK_MAX_DISHES;
   }
 
-  /* 上过场的牌减去还留在桌上的（1 或 2 张），就是已淘汰 */
+  /* 上过场的牌减去还留在桌上的（1 或 2 张），就是已换掉 */
   function pkGone(){
     return Math.max(0, P.seen.length - (P.challenger ? 2 : 1));
   }
@@ -2332,7 +2410,7 @@
     }, reduced ? 0 : 170);
   }
 
-  /* 两个都不想吃：只换挑战者，擂主不动，也不记进淘汰 */
+  /* 两个都不想吃：只换新上来那张，台上那张不动，也不记进换掉 */
   function pkSwapOut(){
     if (P.state !== "face" || P.busy || P.final || !P.challenger) return;
 
@@ -2378,7 +2456,7 @@
       S.undone.push(P.champion.name);
       write("jtsmc.undone", S.undone);
     }
-    /* 决赛翻案：刚被判出局的那张回到牌桌，淘汰数由 pkGone 自动回退 */
+    /* 决赛翻案：刚被换掉的那张回到牌桌，计数由 pkGone 自动回退 */
     setPstate("face");
     renderDuel(false);
     syncPkChrome();
