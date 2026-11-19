@@ -16,7 +16,7 @@
 | `dishes.md` | 菜库清单（180 道，由 `index.html` 同源数据生成，仅作审校留档） |
 | `tools/validate.mjs` | 菜库校验脚本，零依赖，推送前跑一次 |
 | `netlify/functions/pick.mjs` | AI 筛选的代理（约 150 行），key 只在这里以环境变量出现 |
-| `netlify.toml` | 把函数挂到 `/api/pick`，固定 Node 20 |
+| `netlify.toml` | 把函数挂到 `/api/pick`；Node 20 写在 `[build.environment] NODE_VERSION`（不能写在 `[functions]` 下） |
 | `tools/sync-ai.mjs` | 把菜库从 `index.html` 同步进函数，防止两处漂移 |
 
 > `dist/` 是早期遗留的旧副本，**已废弃**，不以它为准，任何修改都只发生在根目录的 `index.html`。

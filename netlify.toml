@@ -1,9 +1,14 @@
 # 页面仍是根目录的单个 index.html，没有构建步骤。
 # 这里只做两件事：把函数目录指明白，以及把 /api/pick 变成短路径。
 
+# Node 版本只能走环境变量。注意：[functions] 下除 directory / node_bundler /
+# external_node_modules / included_files 之外的键，都会被当成「函数名」，
+# 写成 [functions] node_version = "20" 会被要求「must be an object」而直接部署失败。
+[build.environment]
+  NODE_VERSION = "20"
+
 [functions]
   directory = "netlify/functions"
-  node_version = "20"
 
 [[redirects]]
   from = "/api/pick"

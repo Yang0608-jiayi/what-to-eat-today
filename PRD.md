@@ -1043,7 +1043,7 @@
 
 - 部署产物就是仓库根目录的 `index.html`，**不需要构建**。
 - **正式地址走 Netlify**（连 GitHub 仓库，push 自动部署）：`https://gilded-griffin-5da339.netlify.app`。AI 筛选只在它上面可用。
-  - 函数在 `netlify/functions/pick.mjs`，`netlify.toml` 把它挂到 `/api/pick`，Node 20。
+  - 函数在 `netlify/functions/pick.mjs`，`netlify.toml` 把它挂到 `/api/pick`，Node 20（写 `[build.environment]` 的 `NODE_VERSION`，**不能**写成 `[functions]` 下的键——那里的子键会被当成函数名，校验报 "must be an object"）。
   - 三个环境变量在 Netlify 后台设（Site configuration → Environment variables），**不进仓库**：`AI_KEY`（勾 Secret，值填在 Production 一栏）、`AI_BASE`、`AI_MODEL`。
   - 改模型只改环境变量，代码一行不动；改完等下一次部署生效。
 - Gitee Pages 保留为纯静态镜像：同一份 `index.html`，但按域名判断后不渲染 AI 入口，仍然零外部请求。推送后仍需在仓库页 → 服务 → Gitee Pages → 点「更新」。
