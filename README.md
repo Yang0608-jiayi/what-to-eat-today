@@ -20,7 +20,8 @@
 | `netlify.toml` | Netlify 时代的部署配置（把函数挂到 `/api/pick`）。Cloudflare 不读它，保留只为回滚 |
 | `tools/sync-ai.mjs` | 把菜库从 `index.html` 同步进两个函数文件，防止漂移 |
 | `tools/md-dishes.mjs` | 从 `index.html` 生成 `dishes.md`，`--check` 防漂移 |
-| `icon_images/` | 背景暗纹的素材源（9 个 SVG）。只在生成时用，**不参与部署**；换素材后重新生成雪碧图 |
+| `tools/bg-icons.mjs` | 把 `icon_images/` 的 16 个 SVG 生成为背景暗纹（内联雪碧图 + 22 个实例），`--check` 防漂移 |
+| `icon_images/` | 背景暗纹的素材源（16 个 SVG）。只在生成时用，**不参与部署**；换素材后重跑 `tools/bg-icons.mjs` |
 
 > `dist/` 是早期遗留的旧副本，**已废弃**，不以它为准，任何修改都只发生在根目录的 `index.html`。
 
@@ -116,6 +117,7 @@ git push github v4.2
 | `v6.1` | 部署迁到 Cloudflare Pages（`whatfood.top`）：新增 `functions/api/pick.js`，缓存改用 Cache API，`sync-ai` 同时同步两份函数 |
 | `v6.2` | AI 超时按实测重定：单次 4.2s → 9s、总预算 9s → 16s、页面 10.5s → 18s（跨境延迟实测 1.8–9.7s） |
 | `v6.3` | 背景食材暗纹（9 个 SVG 内联、18 个散落实例、墨色低透明度、慢漂移）；AI 入口改成「一句话筛菜」胶囊 + 首次气泡提示 |
+| `v6.4` | 背景用满 16 个素材、22 个实例；不透明度提到 30–38%；漂移 9–16s 可见；入口统一「筛一筛」，气泡改「一句话筛选出你想吃的」；新增 `tools/bg-icons.mjs` |
 
 ## 本地预览
 
@@ -252,8 +254,8 @@ node tools/sync-ai.mjs --check   # 只检查，不一致就报错
 | 玩法切换按钮 | `.switch` 与 `<nav class="switch">` |
 | 翻篇时间（默认凌晨 4 点） | 搜索 `4 * 3600 * 1000` |
 | AI 入口在哪些域名出现 | 搜索 `var AI =` 那一行的正则；Gitee 上不匹配就整颗按钮都不渲染。改了域名要同步函数里的 `OK_HOSTS` |
-| 背景食材暗纹的亮度 / 数量 | `.bg-icons` 里每个 `<svg>` 的 `--o`（不透明度）与 `--s`（尺寸）；数量改 `--x/--y` 的实例即可，素材在 `icon_images/` |
-| AI 入口的文案 | `.ai-btn` 里的 `.ai-label-full`（宽屏「一句话筛菜」）与 `.ai-label-short`（窄屏「筛一筛」） |
+| 背景食材暗纹的亮度 / 数量 / 速度 | 改 `tools/bg-icons.mjs` 里的 `SPOTS`（`--o` 亮度、`--s` 尺寸、`--dur` 周期、`--x/--y` 位置），再跑一次脚本；素材在 `icon_images/` |
+| AI 入口的文案 | `.ai-btn` 里的 `<span>筛一筛</span>` |
 | 首次提示文案 / 出现时机 | 搜索 `jtsmc.ai.tip`，文案在 `#aiTip`，延迟在 `setTimeout(..., 1200)` |
 | AI 的提示词与规则 | `functions/api/pick.js` 的 `SYSTEM`（菜库那段由脚本生成，别手改） |
 | AI 一次挑几道 | `SYSTEM` 里的「6 到 12 道」，以及函数返回前的 `slice(0, 12)` |
