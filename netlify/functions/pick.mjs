@@ -273,7 +273,8 @@ export default async function handler(req) {
 
   /* 免费模型的高峰经常整条排队（1305），所以准备一个候选链：
      AI_MODELS 用逗号分隔可完全自定义；智谱 base 下只配了一个模型时，
-     自动接上另外两个免费文本模型兜底。 */
+     自动接上另外两个免费文本模型兜底。顺序是「小而快」优先——
+     这类任务（从 180 道里挑 8 道）用不着旗舰模型。 */
   let models = (process.env.AI_MODELS || "")
     .split(",")
     .map(function (s) { return s.trim(); })
@@ -281,17 +282,17 @@ export default async function handler(req) {
   if (!models.length) {
     models = [primary];
     if (/bigmodel\.cn/i.test(base)) {
-      ["glm-4.5-flash", "glm-4-flash-250414"].forEach(function (m) {
+      ["glm-4-flash-250414", "glm-4.5-flash"].forEach(function (m) {
         if (models.indexOf(m) < 0) models.push(m);
       });
     }
   }
 
-  /* 总共 9s 预算，单次最多 8.5s。超时说明这个模型此刻就是慢，不再等第二个；
-     1305（排队）/ 1211（模型不存在）/ 5xx / 网络错误才换下一个模型。 */
+  /* 总共 9.2s 预算，单次最多 4.2s：宁可换一个模型，也不在一个慢模型上等死。
+     1305（排队）/ 1211（模型不存在）/ 5xx / 网络错误 / 超时 都换下一个。 */
   const started = Date.now();
   const budget = TIMEOUT;
-  const ATTEMPT = 8500;
+  const ATTEMPT = 4200;
   const ms = function () { return Date.now() - started; };
 
   async function once(name) {
@@ -355,8 +356,11 @@ export default async function handler(req) {
           /* 排队 / 5xx / 模型不存在 → 下一个模型 */
           break;
         }
-        /* 超时：模型太慢，剩下的预算也不够再等一个 */
-        if (err && err.name === "AbortError") break outer;
+        /* 超时：这个模型太慢，剩下的预算够就换下一个，不够就收手 */
+        if (err && err.name === "AbortError") {
+          if (Date.now() + ATTEMPT + 200 > started + budget) break outer;
+          break;
+        }
         /* 网络错误是瞬时的，同一个模型再试一次 */
       }
       if (Date.now() + 1200 > started + budget) break;

@@ -107,6 +107,7 @@ git push github v4.2
 | `v5.7` | 单次放宽到 7s（总线 8.5s）；修 Windows 检出 CRLF 导致 `sync-ai --check` 误报 |
 | `v5.8` | 模型候选链：排队/不存在/5xx 自动换下一个免费模型，可配 `AI_MODELS` |
 | `v5.9` | 预算 9s / 10.5s、单次 8.5s；`max_tokens` 收到 256（只要 12 个菜名） |
+| `v5.10` | 单次收到 4.2s 且超时也换下一个；候选链改成「小而快」优先（Flash → 4.5-Flash） |
 
 ## 本地预览
 
@@ -132,8 +133,8 @@ Netlify 后台 → Site configuration → Environment variables，建三个：
 **免费模型会排队**，所以函数自带一条候选链：
 
 - 配了 `AI_MODELS` 就严格按它走；
-- 只配了 `AI_MODEL`、且 `AI_BASE` 是智谱（`bigmodel.cn`）时，自动接上 `glm-4.5-flash`、`glm-4-flash-250414` 兜底；
-- 排队（1305）/ 模型不存在（1211）/ 5xx 就换下一个；账户限流（1302）和 key 错（401）立刻收手，换模型没用。
+- 只配了 `AI_MODEL`、且 `AI_BASE` 是智谱（`bigmodel.cn`）时，自动接上 `glm-4-flash-250414`、`glm-4.5-flash` 兜底（小而快的排前面）；
+- 排队（1305）/ 模型不存在（1211）/ 5xx / **超时** 都换下一个（单次最多 4.2 秒，不在一个慢模型上等死）；账户限流（1302）和 key 错（401）立刻收手，换模型没用。
 
 换供应商只改 `AI_BASE` + `AI_MODEL`，代码一行不动。改完等下一次 push 触发的部署生效。
 
@@ -228,7 +229,7 @@ EdgeOne Makers 就是 2026-06 更名后的 EdgeOne Pages，静态资源**不需�
 | AI 入口在哪些域名出现 | 搜索 `var AI =` 那一行的正则；Gitee 上不匹配就整颗按钮都不渲染 |
 | AI 的提示词与规则 | `netlify/functions/pick.mjs` 的 `SYSTEM`（菜库那段由脚本生成，别手改） |
 | AI 一次挑几道 | `SYSTEM` 里的「6 到 12 道」，以及函数返回前的 `slice(0, 12)` |
-| AI 的超时（函数 9 秒、页面 10.5 秒） | 函数里的 `const TIMEOUT` 与页面里的 `AI_TIMEOUT`；页面必须略大，否则请求还没回来就被自己掐断。单次尝试上限 8.5 秒；超时不再换下一个模型 |
+| AI 的超时（函数 9 秒、页面 10.5 秒） | 函数里的 `const TIMEOUT` 与页面里的 `AI_TIMEOUT`；页面必须略大，否则请求还没回来就被自己掐断。单次尝试上限 4.2 秒，超时直接换下一个模型 |
 | AI 结果缓存多久 | 函数响应头的 `s-maxage=86400`（CDN）与页面里的 `AI_CACHE_TTL`（本地） |
 | 纸片里的示例句 | 搜索 `sheet-egs`，改 `data-q` |
 

@@ -1061,6 +1061,7 @@ Configuration property functions.node_version must be an object.
 | `v5.7` | `tools/sync-ai.mjs` 先归一化 CRLF 再比较（Windows 检出会误报「菜库不同步」）；新增 `.gitattributes` 把 `*.mjs` / `*.toml` 锁成 LF |
 | `v5.8` | **模型候选链**：`AI_MODELS` 可配，未配时智谱 base 自动接 `glm-4.5-flash`、`glm-4-flash-250414`；排队（1305）/ 模型不存在（1211）/ 5xx 换下一个，账户限流（1302）与 401 立刻收手；失败响应带 `model` + `tried` |
 | `v5.9` | 实测 glm-4.5-flash 在 7.8s 处被我们自己掐断，于是把单次上限放到 8.5s、总线 9s、页面 10.5s；`max_tokens` 从 400 收到 256（只需要 12 个菜名 + 一句概括），少解码就少等 |
+| `v5.10` | 再测仍超时（9003ms 掐在 glm-4.5-flash）：说明「等一个慢模型」这个策略本身错了。改成**单次 4.2 秒、超时也换下一个**，候选链顺序改成「小而快」优先（`glm-4-flash-250414` → `glm-4.5-flash`）。挑 8 道菜用不着旗舰模型，跳三次的总代价仍小于死等一次 |
 
 实测：
 
