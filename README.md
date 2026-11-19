@@ -122,6 +122,7 @@ git push github v4.2
 | `v6.6` | 手机端改用独立坐标（`--xm/--ym/--sm`）贴左右边缘，避开 tab / 签 / 按钮 / chips；小屏亮度再降 15% |
 | `v6.7` | 标题 18px 墨色 + 朱红题头线；chip 作为硬约束传给模型（`k` 参数），AI 生效时点 chip 自动重筛；补 AI 边界文案 |
 | `v6.8` | 窄屏（≤419px）标题收 17px、胶囊右移，375px 下不再与标题相交 |
+| `v6.9` | 提示行改「为你挑了 N 道」；音效喇叭 15→18px、透明度 .5→.55，与胶囊配重 |
 
 ## 本地预览
 
@@ -242,6 +243,7 @@ node tools/sync-ai.mjs --check   # 只检查，不一致就报错
 | 接受态签的放大 | `[data-state="accepted"] .sign` 的 `scale(1.05)`；`.sign` 的 `transform-origin:50% 0` 决定它只向下长、不顶导航线 |
 | 摇签时长 | 搜索 `500 + Math.round(Math.random() * 300)` |
 | 音效音量 | 搜索 `var MASTER =` |
+| 音效图标大小 | `.sound svg` 的 `width/height`（现在 18px）与 `.sound` 的 `opacity` |
 | 摇签的"签筒木签"音 | 搜索 `function playRattle`：`strike()` 里三段带通分别是击打（1100–1600Hz）、木身（180–240Hz）、泛音（380–450Hz）；`room.delayTime` 是筒壁的 30ms 反射 |
 | 木签的节奏 | 同一段里的 `var gap = 0.095` 与 `gap *= 1.14`：改前者是起手快慢，改后者是"越摇越慢"的衰减 |
 | 木签的轻重 | `MASTER * 0.5`（击打）/ `0.22`（木身）/ `0.08`（泛音），抽牌音另有 `intensity 0.6` |
