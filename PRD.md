@@ -360,7 +360,7 @@
 - 复制：`今天吃：{主菜} + {米饭} + {汤}`，与页面上的菜单行同源（`menuText()`）。
 - **关于竖排预算**：确认态下 `.hint` 已被清空却仍占约 31px，用 `.page.meal-on .hint{display:none}` 回收，正好放下这一行，所以 375×667 的余量不需要重算。
 
-### 7.13 AI 一句话筛菜（v5.0，仅 Netlify 版）
+### 7.13 AI 一句话筛菜（v5.0；v6.1 起跑在 Cloudflare Pages）
 
 **要解决的问题**：chip 只有三个，但人的处境是「感冒了」「加班到九点」「月底没钱」——这些不是菜属性，是生活状态。把处境翻译成候选池，是 AI 在这个页面上唯一不可替代的用途。
 
@@ -370,7 +370,7 @@
 |---|---|
 | 入口 | 标题行右侧、音效按钮左边一个 40×40 图标（只在该域名渲染，零新增高度） |
 | 输入 | 底部升起一张纸片：一句话（≤60 字）+ 三个示例 |
-| 请求 | `GET /api/pick?q=…`，同源，5 秒超时 |
+| 请求 | `GET /api/pick?q=…`，同源，页面侧 10.5 秒超时（函数内部 9 秒预算） |
 | 返回 | 6–12 道菜名 + 一个 ≤8 字的概括 |
 | 生效 | 候选池 = AI 挑的菜 ∩ chip 条件 ∩ 划掉排除集 ∩ 今日没吃过 |
 | 显示 | 借 `.hint` 那一行显示 `AI 挑了 12 道 · 点这里改条件`（该行本就有固定高度，不占新空间） |
@@ -378,11 +378,11 @@
 
 - **四级降级**：本地缓存（24h）→ 请求 → 超时 / 坏 JSON / 额度耗尽 → 静默退回全部 450 道，只留 4 秒小字「这次没筛成，先用全部菜」。任何一步失败都不弹错误、不卡住。
 - **模型候选链（v5.8）**：免费模型高峰会整条排队（1305 该模型当前访问量过大）。`AI_MODELS` 可配逗号链；未配且 `AI_BASE` 是智谱时自动接 `glm-4.5-flash`、`glm-4-flash-250414`。排队 / 模型不存在（智谱 `1211`/`1214`、DashScope `Model not exist`、OpenAI `model_not_found`）/ 5xx / 超时都换下一个；**账户限流（1302）与 key 错（401）立刻收手**——换模型不会变好，只会更糟。失败响应带 `model`（最后试的那个）与 `tried`（整条链），便于判断是不是模型名写错。
-- **请求体的两个可选参数（v5.11）**：`enable_thinking: false` 关掉 Qwen3 系列的思考（思考的 token 同样要逐个解码，而这个任务只要 12 个菜名）；`response_format: {"type":"json_object"}` 强制回 JSON，消掉「答得对但裹了客套话」的解析失败。两者都不是通行的字段：上游用 400 明确拒绝时，函数把对应的 `NO_THINKING` / `NO_JSON_MODE` 置为真、去掉字段重试一次，之后同一热容器不再带。`max_tokens` 同时从 256 收到 192。
+- **请求体的两个可选参数（v5.11）**：`enable_thinking: false` 关掉 Qwen3 系列的思考（思考的 token 同样要逐个解码，而这个任务只要 12 个菜名）；`response_format: {"type":"json_object"}` 强制回 JSON，消掉「答得对但裹了客套话」的解析失败。两者都不是通行的字段：上游用 400 明确拒绝时，函数把对应的 `NO_THINKING` / `NO_JSON_MODE` 置为真、去掉字段重试一次，之后同一个 isolate 不再带。`max_tokens` 同时从 256 收到 192。
 - **条件冲突自动让位**：AI 池被 chip 削到只剩 1 道时撤掉 AI 条件并提示；AI 池今天都摇过了就撤掉条件再摇，不判「今日签已尽」。
 - **三种玩法共用**：`candidates()` 是唯一入口，摇签 / 划掉 / 二选一都从同一个池子出牌；改条件后另外两个玩法也会重发牌（v5.0 顺带修了这个既有问题）。
-- **key 为什么不在页面里**：浏览器能读到的东西就等于公开。key 只存在于 Netlify 的环境变量；代理只接受一句 `q`，**不接受 `messages`**，system prompt 与服务端菜库固定——否则就成了免费通用 API。返回的菜名还要过一遍服务端白名单。
-- **额度**：函数响应带 `netlify-cdn-cache-control: public, s-maxage=86400`，同一句话全站只真正调一次模型；配合前端 24h 缓存与关键词前置，日常用量远低于免费额度。失败响应明确 `no-store`，避免把一次故障缓存一整天。
+- **key 为什么不在页面里**：浏览器能读到的东西就等于公开。key 只存在于 Cloudflare Pages 的环境变量；代理只接受一句 `q`，**不接受 `messages`**，system prompt 与服务端菜库固定——否则就成了免费通用 API。返回的菜名还要过一遍服务端白名单。
+- **额度**：函数用 Cache API 缓存成功响应（24h，按 `q` 作 key），同一句话全站只真正调一次模型；配合前端 24h 缓存与输入停顿预请求，日常用量远低于每天 10 万次的免费额度。失败响应明确 `no-store`，避免把一次故障缓存一整天。
 - **Gitee 版**：按域名判断，入口整个不渲染，仍然是零请求的静态页。
 
 ## 8. 内容规范（菜库）
@@ -671,12 +671,12 @@
 - [ ] 落定 12ms、盖章 20ms 短振动（支持的设备上）
 - [ ] 静音后振动仍保留；不支持的设备无报错
 
-**AI 筛选（v5.0，仅 Netlify 版）**
+**AI 筛选（v5.0；v6.1 起在 Cloudflare Pages）**
 
 - [ ] Gitee 地址上不出现 AI 图标，Network 里也没有 `/api/pick`
 - [ ] 输入「感冒了」返回 6–12 道，摇签结果必在其中
 - [ ] 划掉 / 二选一 同样只用这批菜；改条件后两者重新发牌
-- [ ] 同一句话问第二次不再执行函数（CDN 命中），页面秒回
+- [ ] 同一句话问第二次不再执行函数（Cache API 命中），页面秒回
 - [ ] 断网 / 超时 / 上游 500：4 秒内静默退回全库，不卡住、不弹错误
 - [ ] 点提示行能重开纸片；清除条件后回到 450 道
 - [ ] 页面源码、所有响应里都搜不到 key
@@ -684,18 +684,18 @@
 
 **工程**
 
-- [ ] 单一 `index.html`，Gitee 版 DevTools Network 面板中除文档本身外**无任何请求**（含字体、图标、音频）；Netlify 版只在点「帮我筛」后有一次 `/api/pick` 请求
+- [ ] 单一 `index.html`，Gitee 版 DevTools Network 面板中除文档本身外**无任何请求**（含字体、图标、音频）；Cloudflare 版只在点「帮我筛」后有一次 `/api/pick` 请求
 - [ ] 断网状态下双击打开功能完整
 - [ ] 键盘可完成全流程；开启"减少动效"后摇签变为淡入淡出，音效不受影响
 - [ ] `node tools/validate.mjs` 退出码为 0，且 8 种 chip 组合均不为 0
-- [ ] 部署到 Gitee Pages / EdgeOne Makers 后可通过网址公开访问，刷新不 404
+- [ ] 部署到 Gitee Pages / Cloudflare Pages 后可通过网址公开访问，刷新不 404，且 `/PRD.md`、`/tools/` 不可下载
 
 ## 12. 待确认
 
 | 项 | 现状 | 处理 |
 |---|---|---|
 | 分享图 `og:image` | v1 不做 | 视觉定稿后再补 |
-| 自定义域名 | 未定 | 先用 EdgeOne 默认域名；后加时按 README 配 CNAME + 免费证书 |
+| 自定义域名 | 已定 | `whatfood.top`（阿里云注册，NS 托管在 Cloudflare，不备案）；证书由 Cloudflare 自动签发 |
 
 ## 13. 交付节奏
 
@@ -1108,14 +1108,39 @@ Configuration property functions.node_version must be an object.
 | 提示词 | ✅ `sync-ai.mjs` 同步 450 道，system 首行的「全部 450 道菜」与清单行数自洽 |
 | 单测 | ✅ 函数 18/18、候选链 10/10、请求体 14/14（system 道数改为自洽断言，不再写死 180） |
 
+### v6.1（部署迁到 Cloudflare Pages）
+
+起因：Netlify 的运营积分（credit）用尽，生产部署与 Functions 被暂停，`v6.0` 的 450 道一直没能上线。域名、函数、部署方式一起换到 Cloudflare Pages。
+
+1. ~~函数迁移~~ ✅ 新增 `functions/api/pick.js`；文件路径即路由，`/api/pick` 不需要任何 redirect 配置
+2. ~~入口签名~~ ✅ `export default (req)` → `export async function onRequest(context)`，`process.env` → `context.env`
+3. ~~缓存~~ ✅ `netlify-cdn-cache-control` 换成 Cache API（`caches.default`，key 为 `q`，24h，只缓存成功响应）
+4. ~~来源白名单~~ ✅ `OK_ORIGIN` 正则换成 `OK_HOSTS`（`whatfood.top`、`www`、`*.what-to-eat-today-b0r.pages.dev`）
+5. ~~域名~~ ✅ `whatfood.top`（阿里云注册、实名已过、**不备案**），NS 托管在 Cloudflare，证书自动签发；A 记录由 Pages 的 Custom domain 自动创建
+6. ~~同步脚本~~ ✅ `tools/sync-ai.mjs` 改成同时写 `functions/api/pick.js` 与 `netlify/functions/pick.mjs`，保留 Netlify 回滚能力又不产生漂移
+7. ~~文档泄露~~ ✅ Pages 构建只把 `index.html` 复制进 `dist`，`/PRD.md`、`/dishes.md`、`/tools/` 不再可下载
+8. ~~老部署~~ ✅ Netlify 站保留但停止维护；`workers.dev` 那条手动部署的 Worker 作废（大陆不可达，且被一次重新部署顶掉了静态资源）
+
+实测：
+
+| 项 | 结果 |
+|---|---|
+| 域名可达 | ✅ `https://whatfood.top` 国内直连 200，首包约 1.1s、整页约 2.2s（走 Cloudflare 海外节点） |
+| 对照 | `*.workers.dev` 在国内 TCP 直接不通（DNS 通、握手超时），不能作为分享链接 |
+| 单测 | ✅ Functions 版 18/18（OPTIONS/405/q 校验/config/origin/成功过滤/限流/解析/不足 3 道/缓存命中） |
+| 校验 | ✅ `validate.mjs` 0；`sync-ai --check` 0（450 × 2 文件）；`md-dishes --check` 0 |
+
 ## 14. 部署
 
-- 部署产物就是仓库根目录的 `index.html`，**不需要构建**。
-- **正式地址走 Netlify**（连 GitHub 仓库，push 自动部署）：`https://gilded-griffin-5da339.netlify.app`。AI 筛选只在它上面可用。
-  - 函数在 `netlify/functions/pick.mjs`，`netlify.toml` 把它挂到 `/api/pick`，Node 20（写 `[build.environment]` 的 `NODE_VERSION`，**不能**写成 `[functions]` 下的键——那里的子键会被当成函数名，校验报 "must be an object"）。
-  - 四个环境变量在 Netlify 后台设（Site configuration → Environment variables），**不进仓库**：`AI_KEY`（勾 Secret，值填在 Production 一栏）、`AI_BASE`、`AI_MODEL`；可选 `AI_MODELS` 做候选链。当前用的是阿里云百炼国内站：`AI_BASE=https://dashscope.aliyuncs.com/compatible-mode/v1`、`AI_MODEL=qwen-flash`。**改完必须重新部署**——变量是部署时注入函数的，不会热更新（曾经因为漏了这步，函数还在打智谱）。
+- 部署产物仍然是仓库根目录的 `index.html`；Cloudflare Pages 只做一次「复制到 `dist`」，没有真正的构建步骤。
+- **正式地址走 Cloudflare Pages**（连 GitHub 仓库，push 自动部署）：`https://whatfood.top`（项目默认域名 `what-to-eat-today-b0r.pages.dev` 也仍然可用）。AI 筛选只在它上面可用。
+  - 构建配置：Build command `mkdir -p dist && cp index.html dist/index.html`，Build output `dist`，Root directory 留空。只复制 `index.html`，避免把 `PRD.md` / `tools/` / `.git` 发到公网。
+  - 函数在 `functions/api/pick.js`（**不在 `dist` 里**）：Cloudflare 固定从仓库根识别 `functions/`，文件路径即路由，`functions/api/pick.js` → `/api/pick`，不需要 `[[redirects]]` 这类配置。
+  - 四个环境变量在 Pages 项目 → Settings → Variables and secrets 设，**不进仓库**：`AI_KEY`（类型选 **Secret**）、`AI_BASE`、`AI_MODEL`；可选 `AI_MODELS` 做候选链。当前用的是阿里云百炼国内站：`AI_BASE=https://dashscope.aliyuncs.com/compatible-mode/v1`、`AI_MODEL=qwen3.8-flash`、`AI_MODELS=qwen3.8-flash,qwen-flash`。**改完重新部署一次**，让新版本带上变量。
   - 改模型只改环境变量，代码一行不动；改完等下一次部署生效。
+  - 缓存：Netlify 的 `netlify-cdn-cache-control` 在这里无效，改用 **Cache API**（`caches.default`，key 为 `q`，TTL 24h，只有成功响应入缓存）。
+  - 额度：静态请求与带宽不限，Functions 每天 10 万次，构建每月 500 次；额度用完**只限流对应功能**，不会像 Netlify 的 credit 那样把整个团队停掉。
 - Gitee Pages 保留为纯静态镜像：同一份 `index.html`，但按域名判断后不渲染 AI 入口，仍然零外部请求。推送后仍需在仓库页 → 服务 → Gitee Pages → 点「更新」。
 - 两个远端（`origin` = Gitee，`github` = GitHub）内容始终一致，每次同时推。
-- 上线后注意：静态资源默认会被 CDN 缓存，**更新后需重新部署**，否则可能看到旧版本。函数响应另有 24h 的 CDN 缓存，重新部署会清掉。
-- 菜库若有改动，记得跑 `node tools/sync-ai.mjs` 再提交（`--check` 只检查不写）；忘了跑的话 `pick.mjs` 里的池子会比页面旧，AI 永远挑不到新菜。
+- 上线后注意：静态资源默认会被 CDN 缓存，**更新后需重新部署**，否则可能看到旧版本。函数缓存按句独立，正文变了不影响。
+- 菜库若有改动，记得跑 `node tools/sync-ai.mjs` 再提交（会同时写 `functions/api/pick.js` 与 Netlify 备份，`--check` 只检查不写）；忘了跑的话池子会比页面旧，AI 永远挑不到新菜。

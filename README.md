@@ -15,9 +15,10 @@
 | `PRD.md` | 产品规格：状态机、交互规则、验收标准 |
 | `dishes.md` | 菜库清单（450 道，由 `node tools/md-dishes.mjs` 从 `index.html` 生成，仅作审校留档） |
 | `tools/validate.mjs` | 菜库校验脚本，零依赖，推送前跑一次 |
-| `netlify/functions/pick.mjs` | AI 筛选的代理（约 150 行），key 只在这里以环境变量出现 |
-| `netlify.toml` | 把函数挂到 `/api/pick`；Node 20 写在 `[build.environment] NODE_VERSION`（不能写在 `[functions]` 下） |
-| `tools/sync-ai.mjs` | 把菜库从 `index.html` 同步进函数，防止两处漂移 |
+| `functions/api/pick.js` | **AI 筛选的代理（主部署）**。文件路径即路由：`/api/pick`，key 只在这里以环境变量出现 |
+| `netlify/functions/pick.mjs` | 同一份逻辑的 Netlify 版本，留作回滚备份；`tools/sync-ai.mjs` 会把菜库同时写进两份，避免漂移 |
+| `netlify.toml` | Netlify 时代的部署配置（把函数挂到 `/api/pick`）。Cloudflare 不读它，保留只为回滚 |
+| `tools/sync-ai.mjs` | 把菜库从 `index.html` 同步进两个函数文件，防止漂移 |
 | `tools/md-dishes.mjs` | 从 `index.html` 生成 `dishes.md`，`--check` 防漂移 |
 
 > `dist/` 是早期遗留的旧副本，**已废弃**，不以它为准，任何修改都只发生在根目录的 `index.html`。
@@ -38,8 +39,8 @@ git push github v4.2
 ```
 
 - `git push github main` 里的 `main` **不能省**：本地只跟踪 `origin/main`，直接敲 `git push github` 会提示没有上游分支。
-- **GitHub 每一次 push 都会自动触发 Netlify 重新部署**，所以正式地址（`*.netlify.app`）不需要任何手工操作；Gitee Pages 仍是手动点「更新」。
-- 两边仓库内容始终一致：AI 的 key 不在仓库里，只在 Netlify 后台的环境变量。
+- **GitHub 每一次 push 都会自动触发 Cloudflare Pages 重新构建部署**，所以正式地址（`https://whatfood.top`）不需要任何手工操作；Gitee Pages 仍是手动点「更新」。
+- 两边仓库内容始终一致：AI 的 key 不在仓库里，只在 Cloudflare Pages 后台的环境变量。
 - 推送时 PowerShell 会把 git 的 stderr 当异常，输出一片红字。那是进度信息，不是错误；成不成功看引用：
 
 ```powershell
@@ -111,30 +112,31 @@ git push github v4.2
 | `v5.10` | 单次收到 4.2s 且超时也换下一个；候选链改成「小而快」优先（Flash → 4.5-Flash） |
 | `v5.11` | 请求体加 `enable_thinking:false` + `response_format:json_object`；`max_tokens` 256→192；被 400 拒绝时自动降级；模型不存在的判据扩展到 `Model not exist` / `model_not_found` |
 | `v6.0` | 菜库 180 → 450；校验阈值改比例；新增 `tools/md-dishes.mjs` 生成 `dishes.md` |
+| `v6.1` | 部署迁到 Cloudflare Pages（`whatfood.top`）：新增 `functions/api/pick.js`，缓存改用 Cache API，`sync-ai` 同时同步两份函数 |
 
 ## 本地预览
 
 - 直接双击 `index.html` 即可（`file://` 下也能用，localStorage 正常）。
 - 起个本地服务更接近线上：`python -m http.server 8731`，然后访问 `http://127.0.0.1:8731/index.html`。
-- **本地看不到 AI 入口**：它按域名判断，只在 `*.netlify.app` 上渲染（`index.html` 里的 `var AI =`）。要测 AI 就推到 Netlify。
+- **本地看不到 AI 入口**：它按域名判断，只在 `whatfood.top` / `*.pages.dev` 上渲染（`index.html` 里的 `var AI =`）。本地要测就把 `127.0.0.1` 临时加进那条正则，测完改回。
 
 ---
 
-## AI 筛选（只在 Netlify 版）
+## AI 筛选（只在 Cloudflare Pages 版）
 
 ### 一次性配置
 
-Netlify 后台 → Site configuration → Environment variables，建四个（Scopes 要包含 **Functions**）：
+Cloudflare 控制台 → 你的 Pages 项目 → Settings → **Variables and secrets**，建四个：
 
-| Key | Value | Secret |
+| 名称 | 值 | 类型 |
 |---|---|---|
-| `AI_KEY` | 供应商给的 key | ✅ 勾上（值填在 **Production** 一栏，其余留空） |
-| `AI_BASE` | 如 `https://dashscope.aliyuncs.com/compatible-mode/v1` | ⬜ |
-| `AI_MODEL` | 如 `qwen-flash`（以控制台里的真实 ID 为准） | ⬜ |
-| `AI_MODELS` | 可选。逗号分隔的候选链，如 `qwen-flash,qwen-turbo` | ⬜ |
+| `AI_KEY` | 供应商给的 key | **Secret** |
+| `AI_BASE` | 如 `https://dashscope.aliyuncs.com/compatible-mode/v1` | Text |
+| `AI_MODEL` | 如 `qwen3.8-flash`（以控制台里的真实 ID 为准） | Text |
+| `AI_MODELS` | 可选。逗号分隔的候选链，如 `qwen3.8-flash,qwen-flash` | Text |
 
 > 值末尾不要带空格或换行。粘错一个 `\n` 会变成 401，看起来像「key 错了」。
-> 改完**必须重新部署**（Deploys → Trigger deploy）：环境变量是部署时注入函数的，不会热更新。
+> 改完变量后重新部署一次（Deployments → Retry deployment），让新版本带上它们。
 
 **免费模型会排队**，所以函数自带一条候选链：
 
@@ -147,7 +149,7 @@ Netlify 后台 → Site configuration → Environment variables，建四个（Sc
 - `enable_thinking: false` —— Qwen3 系列默认可开思考，思考的 token 同样要逐个解码，而我们只要 12 个菜名；
 - `response_format: {"type":"json_object"}` —— 强制回 JSON，省掉「答得对但裹了客套话」这一类解析失败。
 
-不是每家供应商/型号都认这两个字段。上游若用 400 明确拒绝（错误文本里出现 `enable_thinking` 或 `response_format`），函数会**记住并去掉它重试一次**；之后同一个热容器不再带它。最多浪费一次往返，不会把功能打挂。
+不是每家供应商/型号都认这两个字段。上游若用 400 明确拒绝（错误文本里出现 `enable_thinking` 或 `response_format`），函数会**记住并去掉它重试一次**；之后同一个 isolate 不再带它。最多浪费一次往返，不会把功能打挂。
 
 换供应商只改 `AI_BASE` + `AI_MODEL`，代码一行不动。
 
@@ -156,25 +158,27 @@ Netlify 后台 → Site configuration → Environment variables，建四个（Sc
 浏览器直接打开：
 
 ```
-https://你的站点.netlify.app/api/pick?q=感冒了
+https://whatfood.top/api/pick?q=感冒了
 ```
 
-- 正常：`{"ok":true,"dishes":[...],"label":"..."}`
+- 正常：`{"ok":true,"dishes":[...],"label":"...","model":"…","ms":…}`
+- 同一句话 24 小时内再问会直接命中边缘缓存（`Cache API`），首字会很快
 - 失败：`{"ok":false,"why":"…"}`，`why` 直接说明卡在哪一步，先看它再翻日志：
   - `config` → 环境变量没配齐，`miss` 里列出缺哪个（key 的值永远不会回显）
+  - `origin` → 请求的 `Origin` 不在白名单（正式域名 / `*.pages.dev`）
   - `upstream` → 供应商返回非 2xx，`status` + `detail` 是它的原文（模型名写错最常见）
   - `parse` / `few` → 模型答得不是 JSON，或有效菜名不足 3 道
   - `busy` → 上游 429（模型侧排队，1305）；函数已自动再试一次，还挤不进去就退回全部菜
   - `rate` → 上游 429（账户频率限制，1302）；这时**不要重试**，等一分钟即可
-  - `timeout` / `error` → 8 秒预算用完，或网络异常
-- 仍然排除不了就看 Netlify → Functions → `pick` → 日志。
+  - `timeout` / `error` → 9 秒预算用完，或网络异常
+- 仍然排除不了就看 Cloudflare → Pages 项目 → **Functions → 实时日志**（Real-time logs）。
 
 ### 改菜库之后
 
 函数里有一份菜的清单（提示词要用），它由脚本从 `index.html` 生成，**不要手改**：
 
 ```powershell
-node tools/sync-ai.mjs           # 写入
+node tools/sync-ai.mjs           # 写入（functions/api/pick.js + netlify 备份）
 node tools/sync-ai.mjs --check   # 只检查，不一致就报错
 ```
 
@@ -182,24 +186,29 @@ node tools/sync-ai.mjs --check   # 只检查，不一致就报错
 
 ---
 
-## 部署到 EdgeOne Makers
+## 部署到 Cloudflare Pages
 
-EdgeOne Makers 就是 2026-06 更名后的 EdgeOne Pages，静态资源**不需要构建、不需要 `package.json`**。
+正式地址：`https://whatfood.top`（项目默认域名 `what-to-eat-today-b0r.pages.dev` 也仍然可用）。
 
-**三步：**
+**构建配置**（Settings → Build → Build configuration 的铅笔图标）：
 
-1. 打开 [EdgeOne Makers 控制台](https://console.tencentcloud.com/edgeone/makers) → 新建项目 → 选择 **直接上传（Upload Directly）**。
-2. 把根目录的 `index.html` 拖进去。
-   - 若上传的是文件夹，确保根目录下就是 `index.html`——不要多套一层 `今天吃什么/`，也不要用 `dist/`。
-   - 也可以直接用当前 Git 仓库连 EdgeOne，构建命令留空即可。
-3. 部署完成后会拿到一个 `*.edgeone.app` 之类的默认域名，直接访问即可。
+| 字段 | 值 |
+|---|---|
+| Build command | `mkdir -p dist && cp index.html dist/index.html` |
+| Build output directory | `dist` |
+| Root directory | 留空 |
 
-**换自定义域名（可选，以后再做）**：项目 → 域名管理 → 添加自定义域名 → 按提示在 DNS 加一条 CNAME → 证书用平台的免费证书。
+> 只把 `index.html` 复制进 `dist`，是为了不把 `PRD.md`、`tools/`、`.git` 一起发到公网。
+> **函数不在 `dist` 里**：Cloudflare 固定从仓库根的 `functions/` 目录识别，`functions/api/pick.js` 对应 `/api/pick`，不需要任何 redirect 配置。
+
+**自定义域名**：Pages 项目 → Custom domains → 添加 `whatfood.top` 和 `www.whatfood.top` → Cloudflare 自动创建 CNAME 并签发证书（前提：域名的 NS 已指向 Cloudflare）。
+
+**额度**：静态请求与带宽不限；Pages Functions 每天 10 万次；构建每月 500 次。不会像 Netlify 那样因为 credit 用完把整个账号停掉。
 
 ### 部署后注意事项
 
-- **静态资源会被 CDN 缓存**。改完代码重新上传后，如果看到的还是旧版本，先强制刷新（Ctrl/Cmd+Shift+R）；仍然旧的话在控制台对该次部署做「刷新缓存 / 重新部署」。
-- 页面里没有任何跨域请求，所以**不存在**"某个 CDN 挂了导致页面坏掉"的情况。
+- **静态资源会被 CDN 缓存**。改完代码重新部署后，如果看到的还是旧版本，先强制刷新（Ctrl/Cmd+Shift+R）。
+- 页面里没有任何跨域请求，函数和页面同源，所以**不存在**"某个 CDN 挂了导致页面坏掉"的情况。
 - 音效由 Web Audio 实时合成，**没有音频文件**，不用配置 MIME、也不用担心大文件。
 
 ---
@@ -239,12 +248,12 @@ EdgeOne Makers 就是 2026-06 更名后的 EdgeOne Pages，静态资源**不需�
 | 二选一换牌动画时长 | 搜索 `reduced ? 0 : 170` |
 | 玩法切换按钮 | `.switch` 与 `<nav class="switch">` |
 | 翻篇时间（默认凌晨 4 点） | 搜索 `4 * 3600 * 1000` |
-| AI 入口在哪些域名出现 | 搜索 `var AI =` 那一行的正则；Gitee 上不匹配就整颗按钮都不渲染 |
-| AI 的提示词与规则 | `netlify/functions/pick.mjs` 的 `SYSTEM`（菜库那段由脚本生成，别手改） |
+| AI 入口在哪些域名出现 | 搜索 `var AI =` 那一行的正则；Gitee 上不匹配就整颗按钮都不渲染。改了域名要同步函数里的 `OK_HOSTS` |
+| AI 的提示词与规则 | `functions/api/pick.js` 的 `SYSTEM`（菜库那段由脚本生成，别手改） |
 | AI 一次挑几道 | `SYSTEM` 里的「6 到 12 道」，以及函数返回前的 `slice(0, 12)` |
 | AI 的超时（函数 9 秒、页面 10.5 秒） | 函数里的 `const TIMEOUT` 与页面里的 `AI_TIMEOUT`；页面必须略大，否则请求还没回来就被自己掐断。单次尝试上限 4.2 秒，超时直接换下一个模型 |
-| AI 请求体（关思考 / 强制 JSON） | `pick.mjs` 里 `once()` 组装的那个 `body`；被上游 400 拒绝会自动去掉重试，见 `NO_THINKING` / `NO_JSON_MODE` |
-| AI 结果缓存多久 | 函数响应头的 `s-maxage=86400`（CDN）与页面里的 `AI_CACHE_TTL`（本地） |
+| AI 请求体（关思考 / 强制 JSON） | `functions/api/pick.js` 里 `once()` 组装的那个 `body`；被上游 400 拒绝会自动去掉重试，见 `NO_THINKING` / `NO_JSON_MODE` |
+| AI 结果缓存多久 | 函数里的 `CACHE_TTL`（Cache API，24h，成功才缓存）与页面里的 `AI_CACHE_TTL`（本地） |
 | 纸片里的示例句 | 搜索 `sheet-egs`，改 `data-q` |
 
 ### 改菜库的硬规则（否则过滤会失灵）
@@ -289,7 +298,7 @@ node tools/validate.mjs
 - 一餐组合不持久化，刷新即清——和主菜的行为保持一致，避免"刷新就能重新配一桌"。
 - **AI 只缩小池子，永远不选最终那道菜**：它要是能拍板，签筒就成了表演，"随机"这个承诺也就假了。
 - AI 条件不持久化，刷新即清；它不写进 `localStorage` 的偏好里，因为它描述的是"此刻的处境"，不是"长期的忌口"。
-- AI 只在 `*.netlify.app` 上出现（按域名判断）。Gitee Pages 那份仍然是零请求的静态页，两边共用同一份 `index.html`。
+- AI 只在 `whatfood.top` / `*.pages.dev` 上出现（按域名判断）。Gitee Pages 那份仍然是零请求的静态页，两边共用同一份 `index.html`。
 - AI 失败一律静默退回全部 450 道，不弹错误框——这个页面的语气里不该出现"请求失败"。
 - 上次用的玩法会被记住（含二选一）；想换回来点一下顶部导航即可。
 - 不做深色模式、不做 PWA、不装统计。

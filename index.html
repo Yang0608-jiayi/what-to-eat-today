@@ -712,7 +712,7 @@
   .sound:hover{opacity:1;color:var(--ink-soft)}
   .sound svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 
-  /* ── AI 入口（只在 Netlify 域名渲染，Gitee Pages 上整颗按钮都不存在）── */
+  /* ── AI 入口（只在有函数的域名渲染，Gitee Pages 上整颗按钮都不存在）── */
   .ai-btn{
     position:absolute;
     right:40px;
@@ -1483,7 +1483,7 @@
   var soundBtn  = document.getElementById("sound");
   var wavesEl   = document.getElementById("waves");
 
-  /* AI 筛选（只在 Netlify 部署启用：页面与函数同源） */
+  /* AI 筛选（只在 Cloudflare Pages 部署启用：页面与函数同源） */
   var aiBtn     = document.getElementById("aiBtn");
   var aiSheet   = document.getElementById("aiSheet");
   var aiMask    = document.getElementById("aiMask");
@@ -1525,9 +1525,10 @@
   }
 
   /* ───────── AI：一句话 → 候选池 ───────── */
-  /* 函数和页面同源，所以是相对路径；Gitee Pages 上没有这个接口，
-     按域名判断后连入口都不渲染，那个地址仍然零请求。换自定义域名改这里。 */
-  var AI = /\.netlify\.app$/.test(location.hostname) ? "/api/pick" : "";
+  /* 函数和页面同源（Cloudflare Pages 的 functions/api/pick.js），所以是相对路径。
+     Gitee Pages 上没有这个接口，按域名判断后连入口都不渲染，那个地址仍然零请求。
+     放行正式域名、www，以及 Pages 的预览域名；换域名时改这里和函数里的 OK_HOSTS。 */
+  var AI = /(^|\.)(whatfood\.top|what-to-eat-today-b0r\.pages\.dev)$/.test(location.hostname) ? "/api/pick" : "";
   var AI_TIMEOUT = 10500;
   var AI_CACHE = "jtsmc.ai.";
   var AI_CACHE_TTL = 24 * 3600 * 1000;
