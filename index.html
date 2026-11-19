@@ -2938,9 +2938,10 @@
         applyAI(res, q);
         return;
       }
-      /* 失败也分语气：排队、太慢、没看懂。都不弹错误框 */
-      var msg = why === "busy" ? "模型这会儿排队，先用全部菜"
-              : (why === "timeout" ? "这次问得太久，先用全部菜" : "这次没筛成，先用全部菜");
+      /* 失败也分语气：排队、问太勤、太慢、没看懂。都不弹错误框 */
+      var msg = why === "rate" ? "AI 今天问得有点勤，先用全部菜"
+              : (why === "busy" ? "模型这会儿排队，先用全部菜"
+              : (why === "timeout" ? "这次问得太久，先用全部菜" : "这次没筛成，先用全部菜"));
       setHint(msg);
       setTimeout(function(){
         if (!S.ai && hintEl.textContent === msg) setHint("");

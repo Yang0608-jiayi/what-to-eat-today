@@ -321,6 +321,8 @@ export default async function handler(req) {
       if (r) {
         /* 上游的错误正文里没有 key，截一段带回来，模型名写错时一眼能看出来 */
         detail = (await r.text().catch(function () { return ""; })).slice(0, 240);
+        /* 1302 = 账户频率限制：越试越糟，直接收手；1305 = 模型侧排队，值得再试一次 */
+        if (r.status === 429 && detail.indexOf("1302") > -1) break;
       }
       if (Date.now() + 900 > started + budget) break;
     }
@@ -330,9 +332,10 @@ export default async function handler(req) {
       return json({ ok: false, why: aborted ? "timeout" : "error", detail: String((err && err.message) || "") }, 200, false);
     }
     if (!r.ok) {
+      const rate = detail.indexOf("1302") > -1;
       return json({
         ok: false,
-        why: r.status === 429 ? "busy" : "upstream",
+        why: rate ? "rate" : (r.status === 429 ? "busy" : "upstream"),
         status: r.status,
         detail: detail
       }, 200, false);
