@@ -1039,6 +1039,33 @@
 | 五档尺寸 | ✅ 375/390/1280/1920/320 全部 `scrollHeight == innerHeight`、`scrollWidth == innerWidth`；AI 条件前后高度完全一致 |
 | 菜库校验 | ✅ `validate.mjs` 退出码 0；`sync-ai.mjs --check` 通过 |
 
+### v5.1–v5.4（部署修复与抗拥堵）
+
+v5.0 推上去后 Netlify 直接卡在初始化。日志给了真因，和 TOML 语法无关：
+
+```
+Configuration property functions.node_version must be an object.
+```
+
+`[functions]` 下除 `directory` / `node_bundler` / `external_node_modules` / `included_files` 之外的**任何子键都会被当成「函数名」**，所以 `node_version = "20"` 被读成「有个叫 node_version 的函数，配置必须是对象」。Toml 本身合法（按字节核对过 GitHub 上的 blob，`tomllib` 解析通过），是 schema 不认。
+
+| 版本 | 改了什么 |
+|---|---|
+| `v5.1` | Node 版本改走 `[build.environment] NODE_VERSION`；`[functions]` 只剩 `directory` |
+| `v5.2` | 失败响应加 `why`：`config` / `upstream` / `parse` / `few` / `timeout`，上游原文截 240 字带回（key 不回显） |
+| `v5.3` | 429 / 5xx 自动再试一次；总线 6.5s、页面 7s（页面必须略大）；失败提示分「排队 / 太慢 / 没看懂」三种语气 |
+| `v5.4` | 区分 429 的两种含义：1302 是账户限流（**不重试**，越试越糟），1305 是模型侧排队（值得再试一次）；新增 `rate` 语气 |
+
+实测：
+
+| 项 | 结果 |
+|---|---|
+| 部署 | ✅ v5.1 起每次 push 都到 `Published`，配置解析阶段不再报错 |
+| 函数上线 | ✅ `https://gilded-griffin-5da339.netlify.app/api/pick` 返回 JSON，不再 404 |
+| 环境变量 | ✅ 三项都在；`why` 从未出现 `config`，说明 key / base / model 都读到了 |
+| 上游 | ⚠️ 免费模型高峰返回 429：`1305 该模型当前访问量过大`（重试也挤不进）、`1302 账户速率限制`（测试期自己打多了）。这是供应商侧容量问题，代码只能降级不能变出容量 |
+| 降级 | ✅ 失败时页面只留 4 秒小字（「模型这会儿排队 / AI 今天问得有点勤」），签筒照常可用 |
+
 ## 14. 部署
 
 - 部署产物就是仓库根目录的 `index.html`，**不需要构建**。
