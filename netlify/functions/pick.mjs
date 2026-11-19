@@ -222,7 +222,7 @@ const SYSTEM =
 
 /* 预览部署也要能用，所以放行 xxx--gilded-griffin-5da339.netlify.app */
 const OK_ORIGIN = /^https:\/\/([a-z0-9-]+--)?gilded-griffin-5da339\.netlify\.app$/;
-const TIMEOUT = 8500;
+const TIMEOUT = 9000;
 
 function json(body, status, cache) {
   const useCache = cache !== false;
@@ -287,11 +287,11 @@ export default async function handler(req) {
     }
   }
 
-  /* 总共 8.5s 预算，单次最多 7s。超时说明这个模型此刻就是慢，不再等第二个；
+  /* 总共 9s 预算，单次最多 8.5s。超时说明这个模型此刻就是慢，不再等第二个；
      1305（排队）/ 1211（模型不存在）/ 5xx / 网络错误才换下一个模型。 */
   const started = Date.now();
   const budget = TIMEOUT;
-  const ATTEMPT = 7000;
+  const ATTEMPT = 8500;
   const ms = function () { return Date.now() - started; };
 
   async function once(name) {
@@ -308,7 +308,7 @@ export default async function handler(req) {
         body: JSON.stringify({
           model: name,
           temperature: 0.2,
-          max_tokens: 400,
+          max_tokens: 256,
           messages: [
             { role: "system", content: SYSTEM },
             { role: "user", content: q }

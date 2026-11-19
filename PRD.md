@@ -1060,6 +1060,7 @@ Configuration property functions.node_version must be an object.
 | `v5.6` | 预算放宽到 8.5s（页面 9.5s）、单次 7s；**超时不再重试**（重来只会更慢），只对排队 / 5xx / 网络错误补一次；成功与失败都带 `ms`，一眼看出模型有多慢 |
 | `v5.7` | `tools/sync-ai.mjs` 先归一化 CRLF 再比较（Windows 检出会误报「菜库不同步」）；新增 `.gitattributes` 把 `*.mjs` / `*.toml` 锁成 LF |
 | `v5.8` | **模型候选链**：`AI_MODELS` 可配，未配时智谱 base 自动接 `glm-4.5-flash`、`glm-4-flash-250414`；排队（1305）/ 模型不存在（1211）/ 5xx 换下一个，账户限流（1302）与 401 立刻收手；失败响应带 `model` + `tried` |
+| `v5.9` | 实测 glm-4.5-flash 在 7.8s 处被我们自己掐断，于是把单次上限放到 8.5s、总线 9s、页面 10.5s；`max_tokens` 从 400 收到 256（只需要 12 个菜名 + 一句概括），少解码就少等 |
 
 实测：
 
