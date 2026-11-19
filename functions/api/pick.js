@@ -493,6 +493,8 @@ const SYSTEM =
   "- 「庆祝」「请客」优先 荤 和 重口。\n" +
   "- 「减脂」优先 清淡、素，避开 重口。\n" +
   "- 用户没说自己能吃辣时，不要整池都是辣的。\n" +
+  "- 用户消息里若出现「硬性要求」，每一条都必须满足：宁可少给几道，也不能拿不符合的菜凑数；" +
+  "「想吃面」就要全是带「面」标签的，「清淡」就要全带「清淡」，「不要辣」就一道辣的都不能有。\n" +
   "只输出 JSON，不要解释、不要代码围栏：" +
   '{"dishes":["菜名","菜名"],"label":"不超过8个字的概括"}';
 
@@ -549,6 +551,21 @@ function parseLoose(raw) {
   }
 }
 
+/* 前端把三个 chip 压成 "0,1,1"：不吃辣 / 清淡点 / 想吃面。
+   这里是它们进入提示词的唯一入口——模型看不到浏览器里的其他状态。 */
+function parseKeys(raw) {
+  const p = String(raw || "").split(",");
+  return [p[0] === "1", p[1] === "1", p[2] === "1"];
+}
+
+function keyRules(k) {
+  const r = [];
+  if (k[0]) r.push("不要辣：不能带「辣」标签");
+  if (k[1]) r.push("清淡：必须带「清淡」标签");
+  if (k[2]) r.push("想吃面：必须带「面」标签");
+  return r;
+}
+
 /* Pages Functions 的入口：所有方法都进这里。
    GET 走「先查边缘缓存，没有再算」，OPTIONS 给预检。 */
 export async function onRequest(context) {
@@ -569,15 +586,17 @@ export async function onRequest(context) {
   const q = (new URL(req.url).searchParams.get("q") || "").trim();
   if (!q || q.length > 60) return json({ ok: false, why: "q" }, 200, false);
 
-  /* 同一句话 24h 内只打一次上游。key 只由 q 决定，不含任何用户信息。 */
+  /* 同一句话 + 同一组 chip 24h 内只打一次上游。key 只由 q 和 k 决定，不含用户信息。 */
+  const k = parseKeys(new URL(req.url).searchParams.get("k"));
+  const kStr = k.map(function (v) { return v ? 1 : 0; }).join(",");
   const cache = typeof caches !== "undefined" ? caches.default : null;
-  const cacheKey = new Request("https://pick-cache.internal/?q=" + encodeURIComponent(q));
+  const cacheKey = new Request("https://pick-cache.internal/?q=" + encodeURIComponent(q) + "&k=" + kStr);
   if (cache) {
     const hit = await cache.match(cacheKey);
     if (hit) return hit;
   }
 
-  const res = await run(req, env);
+  const res = await run(req, env, k);
   /* 只有成功响应带 s-maxage，失败一律 no-store，不进缓存 */
   if (cache && (res.headers.get("cache-control") || "").indexOf("s-maxage") > -1) {
     context.waitUntil(cache.put(cacheKey, res.clone()));
@@ -585,11 +604,17 @@ export async function onRequest(context) {
   return res;
 }
 
-async function run(req, env) {
+async function run(req, env, k) {
   if (req.method !== "GET") return json({ ok: false }, 405, false);
 
   const q = (new URL(req.url).searchParams.get("q") || "").trim();
   if (!q || q.length > 60) return json({ ok: false, why: "q" }, 200, false);
+
+  const rules = keyRules(k || parseKeys(""));
+  /* 有 chip 就压成用户消息里的硬约束；没 chip 时和以前完全一样 */
+  const userContent = rules.length
+    ? q + "\n\n硬性要求（每一条都必须满足，不满足的菜不要选）：\n- " + rules.join("\n- ")
+    : q;
 
   /* 同源请求不带 Origin；带了的就必须是自己人 */
   const origin = req.headers.get("origin");
@@ -639,7 +664,7 @@ async function run(req, env) {
       max_tokens: 192,
       messages: [
         { role: "system", content: SYSTEM },
-        { role: "user", content: q }
+        { role: "user", content: userContent }
       ]
     };
     /* 关思考：Qwen3 系列默认可开思考，思考的 token 一样要逐个解码，

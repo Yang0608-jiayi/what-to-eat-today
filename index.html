@@ -141,11 +141,22 @@
 
   h1{
     margin:0;
-    font-size:14px;
-    font-weight:400;
-    letter-spacing:.34em;
-    text-indent:.34em;
-    color:var(--muted);
+    font-size:18px;
+    font-weight:500;
+    line-height:1.2;
+    letter-spacing:.2em;
+    text-indent:.2em;
+    color:var(--ink);
+  }
+  /* 题头线：一小截朱红，只做“这是标题”的提示，不加装饰感 */
+  h1::after{
+    content:"";
+    display:block;
+    width:20px;
+    height:1px;
+    margin:4px auto 0;
+    background:var(--seal);
+    opacity:.5;
   }
 
   /* ── 签 ───────────────────────────── */
@@ -693,7 +704,7 @@
     display:flex;
     align-items:center;
     justify-content:center;
-    margin-bottom:10px;
+    margin-bottom:6px;
   }
 
   /* 下划线文字 tab：不要底、不要框、不要影，只有一条页宽发丝线，
@@ -701,7 +712,7 @@
   .switch{
     display:flex;
     gap:0;
-    margin-bottom:14px;
+    margin-bottom:12px;
     border-bottom:1px solid rgba(100,108,80,.18);
   }
   .switch button{
@@ -839,7 +850,10 @@
     animation:sheet-in .22s var(--ease);
   }
   @keyframes sheet-in{from{transform:translateY(14px);opacity:0}to{transform:translateY(0);opacity:1}}
-  .sheet-title{margin:0 0 14px;font-size:13px;letter-spacing:.12em;color:var(--ink);text-align:center}
+  .sheet-title{margin:0 0 4px;font-size:13px;letter-spacing:.12em;color:var(--ink);text-align:center}
+  /* 边界说明：只缩小范围，不替用户做决定 */
+  .sheet-sub{margin:0 0 14px;font-size:11px;color:var(--muted);text-align:center}
+  .sheet-note{margin:0 0 12px;font-size:11px;color:var(--muted);text-align:center}
   .sheet-input{
     width:100%;
     height:44px;
@@ -1055,6 +1069,7 @@
   <div class="sheet-mask" id="aiMask"></div>
   <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="aiTitle">
     <p class="sheet-title" id="aiTitle">说说现在的情况</p>
+    <p class="sheet-sub">只帮你缩小范围，最后仍由你摇</p>
     <input class="sheet-input" id="aiInput" type="text" maxlength="60" autocomplete="off"
            enterkeyhint="go" placeholder="比如：感冒了，想吃点热乎的">
     <div class="sheet-egs">
@@ -1062,6 +1077,7 @@
       <button type="button" data-q="感冒了">感冒了</button>
       <button type="button" data-q="月底了，省点钱">月末省钱</button>
     </div>
+    <p class="sheet-note">会结合页面上的「不吃辣 / 清淡点 / 想吃面」</p>
     <button class="btn" id="aiGo">帮我筛</button>
     <button class="link sheet-clear" id="aiClear" hidden>清除条件，回到全部菜</button>
   </div>
@@ -1977,7 +1993,10 @@
   }
 
   function aiHintText(){
-    return S.ai ? ("AI 挑了 " + S.ai.names.length + " 道 · 点这里改条件") : "";
+    if (!S.ai) return "";
+    var extra = chipLabels();
+    return "AI 挑了 " + S.ai.names.length + " 道 · " + S.ai.label +
+      (extra.length ? " + " + extra.join("·") : "");
   }
 
   /* 提示行本来就有 1.5em 的固定高度，AI 条件借它显示 → 不占额外空间。
@@ -3221,13 +3240,25 @@
     aiClear.hidden = !S.ai;
   }
 
-  function aiCacheKey(q){ return AI_CACHE + q; }
+  function aiCacheKey(q, keys){ return AI_CACHE + keys + "|" + q; }
+
+  /* 三个 chip 压成 "0,1,1"，和 q 一起送去筛；模型看不到浏览器里的其他状态 */
+  function chipKeys(){
+    return (S.noSpicy ? "1" : "0") + "," + (S.gentle ? "1" : "0") + "," + (S.noodle ? "1" : "0");
+  }
+  function chipLabels(){
+    var a = [];
+    if (S.noSpicy) a.push("不吃辣");
+    if (S.gentle) a.push("清淡点");
+    if (S.noodle) a.push("想吃面");
+    return a;
+  }
 
   /* 四级降级：本地缓存 → 请求 → 超时/坏 JSON → 全库。任何一步失败都只回 null */
-  function askAI(q, done){
+  function askAI(q, keys, done){
     if (!AI){ done(null); return; }
     try {
-      var hit = localStorage.getItem(aiCacheKey(q));
+      var hit = localStorage.getItem(aiCacheKey(q, keys));
       if (hit){
         var c = JSON.parse(hit);
         if (c && c.ok && c.dishes && c.dishes.length >= 2 && Date.now() - (c.t || 0) < AI_CACHE_TTL){
@@ -3240,7 +3271,7 @@
     var ctl = window.AbortController ? new AbortController() : null;
     var timer = setTimeout(function(){ if (ctl) ctl.abort(); }, AI_TIMEOUT);
 
-    fetch(AI + "?q=" + encodeURIComponent(q), ctl ? { signal: ctl.signal } : {})
+    fetch(AI + "?q=" + encodeURIComponent(q) + "&k=" + encodeURIComponent(keys), ctl ? { signal: ctl.signal } : {})
       .then(function(r){ return r.ok ? r.json() : null; })
       .then(function(d){
         clearTimeout(timer);
@@ -3249,16 +3280,18 @@
         var names = d.dishes.filter(function(n){ return !!DISH_BY_NAME[n]; });
         if (names.length < 2){ done(null, "few"); return; }
         var res = { ok: true, dishes: names, label: String(d.label || ""), t: Date.now() };
-        try { localStorage.setItem(aiCacheKey(q), JSON.stringify(res)); } catch(e){}
+        try { localStorage.setItem(aiCacheKey(q, keys), JSON.stringify(res)); } catch(e){}
         done(res);
       })
       .catch(function(){ clearTimeout(timer); done(null, "timeout"); });
   }
 
-  function applyAI(res, q){
+  function applyAI(res, q, keys){
     S.ai = {
       label: (res.label || q || "刚刚说的").slice(0, 12),
-      names: res.dishes
+      names: res.dishes,
+      q: q || "",
+      keys: keys || ""
     };
     syncAI();
     afterChipChange();
@@ -3278,6 +3311,25 @@
     liveEl.textContent = "回到全部菜";
   }
 
+  /* chip 变了而 AI 还生效：带上新条件重筛一次，别让交集直接空掉 */
+  var aiRefining = false;
+  function refineAI(){
+    if (!S.ai || !S.ai.q || aiRefining) return;
+    var keys = chipKeys();
+    if (keys === S.ai.keys) return;
+    var q = S.ai.q;
+    aiRefining = true;
+    var labels = chipLabels();
+    setHint("按「" + (labels.length ? labels.join("、") : "新条件") + "」重新筛…");
+    askAI(q, keys, function(res){
+      aiRefining = false;
+      if (res){ applyAI(res, q, keys); return; }
+      /* 筛不出来就撤掉 AI，让 chip 自己生效——至少能看到想吃的面 */
+      clearAI();
+      setHint("AI 没筛出符合的，先用全部菜");
+    });
+  }
+
   function openSheet(){
     if (!AI) return;
     aiSheet.hidden = false;
@@ -3294,14 +3346,15 @@
   function runAI(){
     var q = aiInput.value.trim();
     if (!q || aiGo.disabled) return;
+    var keys = chipKeys();
     aiGo.disabled = true;
     aiGo.textContent = "正在看菜谱…";
-    askAI(q, function(res, why){
+    askAI(q, keys, function(res, why){
       aiGo.disabled = false;
       aiGo.textContent = "帮我筛";
       closeSheet();
       if (res){
-        applyAI(res, q);
+        applyAI(res, q, keys);
         return;
       }
       /* 失败也分语气：排队、问太勤、太慢、没看懂。都不弹错误框 */
@@ -3322,7 +3375,7 @@
     clearTimeout(prefetchTimer);
     var q = aiInput.value.trim();
     if (q.length < 2) return;
-    prefetchTimer = setTimeout(function(){ askAI(q, function(){}); }, 1200);
+    prefetchTimer = setTimeout(function(){ askAI(q, chipKeys(), function(){}); }, 1200);
   }
 
   aiBtn.addEventListener("click", function(){ aiTip.hidden = true; openSheet(); });
@@ -3372,6 +3425,7 @@
     syncChips();
     playTick(S.noSpicy);
     afterChipChange();
+    refineAI();
   });
 
   chipGentle.addEventListener("click", function(){
@@ -3380,6 +3434,7 @@
     syncChips();
     playTick(S.gentle);
     afterChipChange();
+    refineAI();
   });
 
   chipNoodle.addEventListener("click", function(){
@@ -3388,6 +3443,7 @@
     syncChips();
     playTick(S.noodle);
     afterChipChange();
+    refineAI();
   });
 
   soundBtn.addEventListener("click", function(){

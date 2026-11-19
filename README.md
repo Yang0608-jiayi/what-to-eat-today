@@ -120,6 +120,7 @@ git push github v4.2
 | `v6.4` | 背景用满 16 个素材、22 个实例；不透明度提到 30–38%；漂移 9–16s 可见；入口统一「筛一筛」，气泡改「一句话筛选出你想吃的」；新增 `tools/bg-icons.mjs` |
 | `v6.5` | 修手机只显示左半边（`nth-child(even)` 恰好藏掉全部右侧）；中间补 6 个实例、遮罩中心留 30%；背景恢复素材原色 |
 | `v6.6` | 手机端改用独立坐标（`--xm/--ym/--sm`）贴左右边缘，避开 tab / 签 / 按钮 / chips；小屏亮度再降 15% |
+| `v6.7` | 标题 18px 墨色 + 朱红题头线；chip 作为硬约束传给模型（`k` 参数），AI 生效时点 chip 自动重筛；补 AI 边界文案 |
 
 ## 本地预览
 
@@ -159,6 +160,8 @@ Cloudflare 控制台 → 你的 Pages 项目 → Settings → **Variables and se
 不是每家供应商/型号都认这两个字段。上游若用 400 明确拒绝（错误文本里出现 `enable_thinking` 或 `response_format`），函数会**记住并去掉它重试一次**；之后同一个 isolate 不再带它。最多浪费一次往返，不会把功能打挂。
 
 换供应商只改 `AI_BASE` + `AI_MODEL`，代码一行不动。
+
+**chip 会一起传给模型（v6.7）**：请求带 `k=0,1,1`（不吃辣 / 清淡点 / 想吃面），服务端翻成用户消息里的「硬性要求」，system 里要求「宁可少给也不能拿不符合的菜凑数」。AI 生效时点 chip 会自动带上新 k 重筛；重筛失败会撤掉 AI，让 chip 在全部 450 道上独立生效。
 
 ### 验证
 
@@ -265,6 +268,8 @@ node tools/sync-ai.mjs --check   # 只检查，不一致就报错
 | AI 请求体（关思考 / 强制 JSON） | `functions/api/pick.js` 里 `once()` 组装的那个 `body`；被上游 400 拒绝会自动去掉重试，见 `NO_THINKING` / `NO_JSON_MODE` |
 | AI 结果缓存多久 | 函数里的 `CACHE_TTL`（Cache API，24h，成功才缓存）与页面里的 `AI_CACHE_TTL`（本地） |
 | 纸片里的示例句 | 搜索 `sheet-egs`，改 `data-q` |
+| 标题字号 / 颜色 / 题头线 | `h1` 的 `font-size`、`color` 与 `h1::after`（朱红线宽度、透明度） |
+| AI 的 chip 硬约束 | 前端 `chipKeys()`，服务端 `keyRules()`（把 `k` 翻成「硬性要求」）；两边要一起改 |
 
 ### 改菜库的硬规则（否则过滤会失灵）
 
