@@ -224,6 +224,11 @@ const SYSTEM =
 const OK_ORIGIN = /^https:\/\/([a-z0-9-]+--)?gilded-griffin-5da339\.netlify\.app$/;
 const TIMEOUT = 9000;
 
+/* 下面两个是可选的请求参数，不是每家供应商都认。被 400 明确拒绝过一次就记住，
+   本容器后续请求不再带——Netlify 会复用热容器，最多只浪费一次往返。 */
+let NO_THINKING = false;
+let NO_JSON_MODE = false;
+
 function json(body, status, cache) {
   const useCache = cache !== false;
   const headers = {
@@ -299,6 +304,21 @@ export default async function handler(req) {
     const left = started + budget - Date.now();
     const ctl = new AbortController();
     const timer = setTimeout(function () { ctl.abort(); }, Math.max(800, Math.min(ATTEMPT, left)));
+    const body = {
+      model: name,
+      temperature: 0.2,
+      /* 只要 12 个菜名 + 一句概括，192 够用；少解码就少等 */
+      max_tokens: 192,
+      messages: [
+        { role: "system", content: SYSTEM },
+        { role: "user", content: q }
+      ]
+    };
+    /* 关思考：Qwen3 系列默认可开思考，思考的 token 一样要逐个解码，
+       而这个任务只是从菜库里挑名字。不认这个字段的供应商会在下面被 400 兜住。 */
+    if (!NO_THINKING) body.enable_thinking = false;
+    /* 强制 JSON：省掉「答得对但裹了客套话」这一类解析失败 */
+    if (!NO_JSON_MODE) body.response_format = { type: "json_object" };
     try {
       return await fetch(base + "/chat/completions", {
         method: "POST",
@@ -306,15 +326,7 @@ export default async function handler(req) {
           "content-type": "application/json",
           authorization: "Bearer " + key
         },
-        body: JSON.stringify({
-          model: name,
-          temperature: 0.2,
-          max_tokens: 256,
-          messages: [
-            { role: "system", content: SYSTEM },
-            { role: "user", content: q }
-          ]
-        }),
+        body: JSON.stringify(body),
         signal: ctl.signal
       });
     } finally {
@@ -348,10 +360,20 @@ export default async function handler(req) {
         if (r) {
           /* 上游的错误正文里没有 key，截一段带回来，模型名写错时一眼能看出来 */
           detail = (await r.text().catch(function () { return ""; })).slice(0, 240);
+          /* 可选参数被拒（有的型号不认 enable_thinking / response_format）：
+             记住并去掉它重来一次。400 里只有这一种值得重试，其余重试无意义。 */
+          if (r.status === 400) {
+            let dropped = false;
+            if (!NO_THINKING && /enable_thinking/i.test(detail)) { NO_THINKING = true; dropped = true; }
+            if (!NO_JSON_MODE && /response_format|json_object|json mode/i.test(detail)) { NO_JSON_MODE = true; dropped = true; }
+            if (dropped) continue;
+          }
           /* 1302 是账户限流，换模型也没用，越试越糟 */
           if (r.status === 429 && detail.indexOf("1302") > -1) break outer;
-          /* 1211 / 1214 = 模型不存在或不支持：换下一个；其他 4xx（钥匙错、参数错）换也没用 */
-          const modelMissing = /"code"\s*:\s*"12(11|14)"/.test(detail);
+          /* 模型不存在 / 不支持：智谱是 1211/1214，DashScope 是「Model not exist」，
+             OpenAI 是 model_not_found。三种都要换下一个模型试，其余 4xx（key 错、
+             参数错）换也没用。 */
+          const modelMissing = /"code"\s*:\s*"12(11|14)"|model[^"]{0,40}not[^"]{0,20}(exist|found)|model_not_found/i.test(detail);
           if (r.status < 500 && r.status !== 429 && !modelMissing) break outer;
           /* 排队 / 5xx / 模型不存在 → 下一个模型 */
           break;

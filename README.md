@@ -108,6 +108,7 @@ git push github v4.2
 | `v5.8` | 模型候选链：排队/不存在/5xx 自动换下一个免费模型，可配 `AI_MODELS` |
 | `v5.9` | 预算 9s / 10.5s、单次 8.5s；`max_tokens` 收到 256（只要 12 个菜名） |
 | `v5.10` | 单次收到 4.2s 且超时也换下一个；候选链改成「小而快」优先（Flash → 4.5-Flash） |
+| `v5.11` | 请求体加 `enable_thinking:false` + `response_format:json_object`；`max_tokens` 256→192；被 400 拒绝时自动降级；模型不存在的判据扩展到 `Model not exist` / `model_not_found` |
 
 ## 本地预览
 
@@ -121,22 +122,32 @@ git push github v4.2
 
 ### 一次性配置
 
-Netlify 后台 → Site configuration → Environment variables，建三个：
+Netlify 后台 → Site configuration → Environment variables，建四个（Scopes 要包含 **Functions**）：
 
 | Key | Value | Secret |
 |---|---|---|
 | `AI_KEY` | 供应商给的 key | ✅ 勾上（值填在 **Production** 一栏，其余留空） |
-| `AI_BASE` | 例 `https://open.bigmodel.cn/api/paas/v4` | ⬜ |
-| `AI_MODEL` | 例 `glm-4.7-flash`（以控制台里的免费型号为准） | ⬜ |
-| `AI_MODELS` | 可选。逗号分隔的候选链，如 `glm-4.7-flash,glm-4.5-flash` | ⬜ |
+| `AI_BASE` | 如 `https://dashscope.aliyuncs.com/compatible-mode/v1` | ⬜ |
+| `AI_MODEL` | 如 `qwen-flash`（以控制台里的真实 ID 为准） | ⬜ |
+| `AI_MODELS` | 可选。逗号分隔的候选链，如 `qwen-flash,qwen-turbo` | ⬜ |
+
+> 值末尾不要带空格或换行。粘错一个 `\n` 会变成 401，看起来像「key 错了」。
+> 改完**必须重新部署**（Deploys → Trigger deploy）：环境变量是部署时注入函数的，不会热更新。
 
 **免费模型会排队**，所以函数自带一条候选链：
 
 - 配了 `AI_MODELS` 就严格按它走；
 - 只配了 `AI_MODEL`、且 `AI_BASE` 是智谱（`bigmodel.cn`）时，自动接上 `glm-4-flash-250414`、`glm-4.5-flash` 兜底（小而快的排前面）；
-- 排队（1305）/ 模型不存在（1211）/ 5xx / **超时** 都换下一个（单次最多 4.2 秒，不在一个慢模型上等死）；账户限流（1302）和 key 错（401）立刻收手，换模型没用。
+- 排队（1305）/ 模型不存在（智谱 `1211`/`1214`、DashScope `Model not exist`、OpenAI `model_not_found`）/ 5xx / **超时** 都换下一个（单次最多 4.2 秒，不在一个慢模型上等死）；账户限流（1302）和 key 错（401）立刻收手，换模型没用。
 
-换供应商只改 `AI_BASE` + `AI_MODEL`，代码一行不动。改完等下一次 push 触发的部署生效。
+**请求体额外带两个可选参数**（v5.11）：
+
+- `enable_thinking: false` —— Qwen3 系列默认可开思考，思考的 token 同样要逐个解码，而我们只要 12 个菜名；
+- `response_format: {"type":"json_object"}` —— 强制回 JSON，省掉「答得对但裹了客套话」这一类解析失败。
+
+不是每家供应商/型号都认这两个字段。上游若用 400 明确拒绝（错误文本里出现 `enable_thinking` 或 `response_format`），函数会**记住并去掉它重试一次**；之后同一个热容器不再带它。最多浪费一次往返，不会把功能打挂。
+
+换供应商只改 `AI_BASE` + `AI_MODEL`，代码一行不动。
 
 ### 验证
 
@@ -230,6 +241,7 @@ EdgeOne Makers 就是 2026-06 更名后的 EdgeOne Pages，静态资源**不需�
 | AI 的提示词与规则 | `netlify/functions/pick.mjs` 的 `SYSTEM`（菜库那段由脚本生成，别手改） |
 | AI 一次挑几道 | `SYSTEM` 里的「6 到 12 道」，以及函数返回前的 `slice(0, 12)` |
 | AI 的超时（函数 9 秒、页面 10.5 秒） | 函数里的 `const TIMEOUT` 与页面里的 `AI_TIMEOUT`；页面必须略大，否则请求还没回来就被自己掐断。单次尝试上限 4.2 秒，超时直接换下一个模型 |
+| AI 请求体（关思考 / 强制 JSON） | `pick.mjs` 里 `once()` 组装的那个 `body`；被上游 400 拒绝会自动去掉重试，见 `NO_THINKING` / `NO_JSON_MODE` |
 | AI 结果缓存多久 | 函数响应头的 `s-maxage=86400`（CDN）与页面里的 `AI_CACHE_TTL`（本地） |
 | 纸片里的示例句 | 搜索 `sheet-egs`，改 `data-q` |
 

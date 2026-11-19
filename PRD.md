@@ -377,7 +377,8 @@
 | 撤销 | 点那一行 → 纸片里「清除条件，回到全部菜」；刷新页面也会清 |
 
 - **四级降级**：本地缓存（24h）→ 请求 → 超时 / 坏 JSON / 额度耗尽 → 静默退回 180 道，只留 4 秒小字「这次没筛成，先用全部菜」。任何一步失败都不弹错误、不卡住。
-- **模型候选链（v5.8）**：免费模型高峰会整条排队（1305 该模型当前访问量过大）。`AI_MODELS` 可配逗号链；未配且 `AI_BASE` 是智谱时自动接 `glm-4.5-flash`、`glm-4-flash-250414`。排队 / 模型不存在（1211、1214）/ 5xx 换下一个；**账户限流（1302）与 key 错（401）立刻收手**——换模型不会变好，只会更糟。超时不换下一个（剩下的预算也不够再等一轮）。失败响应带 `model`（最后试的那个）与 `tried`（整条链），便于判断是不是模型名写错。
+- **模型候选链（v5.8）**：免费模型高峰会整条排队（1305 该模型当前访问量过大）。`AI_MODELS` 可配逗号链；未配且 `AI_BASE` 是智谱时自动接 `glm-4.5-flash`、`glm-4-flash-250414`。排队 / 模型不存在（智谱 `1211`/`1214`、DashScope `Model not exist`、OpenAI `model_not_found`）/ 5xx / 超时都换下一个；**账户限流（1302）与 key 错（401）立刻收手**——换模型不会变好，只会更糟。失败响应带 `model`（最后试的那个）与 `tried`（整条链），便于判断是不是模型名写错。
+- **请求体的两个可选参数（v5.11）**：`enable_thinking: false` 关掉 Qwen3 系列的思考（思考的 token 同样要逐个解码，而这个任务只要 12 个菜名）；`response_format: {"type":"json_object"}` 强制回 JSON，消掉「答得对但裹了客套话」的解析失败。两者都不是通行的字段：上游用 400 明确拒绝时，函数把对应的 `NO_THINKING` / `NO_JSON_MODE` 置为真、去掉字段重试一次，之后同一热容器不再带。`max_tokens` 同时从 256 收到 192。
 - **条件冲突自动让位**：AI 池被 chip 削到只剩 1 道时撤掉 AI 条件并提示；AI 池今天都摇过了就撤掉条件再摇，不判「今日签已尽」。
 - **三种玩法共用**：`candidates()` 是唯一入口，摇签 / 划掉 / 二选一都从同一个池子出牌；改条件后另外两个玩法也会重发牌（v5.0 顺带修了这个既有问题）。
 - **key 为什么不在页面里**：浏览器能读到的东西就等于公开。key 只存在于 Netlify 的环境变量；代理只接受一句 `q`，**不接受 `messages`**，system prompt 与服务端菜库固定——否则就成了免费通用 API。返回的菜名还要过一遍服务端白名单。
@@ -1062,6 +1063,7 @@ Configuration property functions.node_version must be an object.
 | `v5.8` | **模型候选链**：`AI_MODELS` 可配，未配时智谱 base 自动接 `glm-4.5-flash`、`glm-4-flash-250414`；排队（1305）/ 模型不存在（1211）/ 5xx 换下一个，账户限流（1302）与 401 立刻收手；失败响应带 `model` + `tried` |
 | `v5.9` | 实测 glm-4.5-flash 在 7.8s 处被我们自己掐断，于是把单次上限放到 8.5s、总线 9s、页面 10.5s；`max_tokens` 从 400 收到 256（只需要 12 个菜名 + 一句概括），少解码就少等 |
 | `v5.10` | 再测仍超时（9003ms 掐在 glm-4.5-flash）：说明「等一个慢模型」这个策略本身错了。改成**单次 4.2 秒、超时也换下一个**，候选链顺序改成「小而快」优先（`glm-4-flash-250414` → `glm-4.5-flash`）。挑 8 道菜用不着旗舰模型，跳三次的总代价仍小于死等一次 |
+| `v5.11` | **换供应商到阿里云百炼（千问 Flash）**。请求体加 `enable_thinking:false` + `response_format:json_object`，`max_tokens` 256→192；两个字段被 400 拒绝时自动去掉并重试一次，结果记在 `NO_THINKING` / `NO_JSON_MODE`；「模型不存在」的判据扩展到 `Model not exist` / `model_not_found` |
 
 实测：
 
@@ -1070,15 +1072,25 @@ Configuration property functions.node_version must be an object.
 | 部署 | ✅ v5.1 起每次 push 都到 `Published`，配置解析阶段不再报错 |
 | 函数上线 | ✅ `https://gilded-griffin-5da339.netlify.app/api/pick` 返回 JSON，不再 404 |
 | 环境变量 | ✅ 三项都在；`why` 从未出现 `config`，说明 key / base / model 都读到了 |
-| 上游 | ⚠️ 免费模型高峰返回 429：`1305 该模型当前访问量过大`（重试也挤不进）、`1302 账户速率限制`（测试期自己打多了）。这是供应商侧容量问题，代码只能降级不能变出容量 |
+| 上游 | ⚠️ 智谱免费模型高峰返回 429：`1305 该模型当前访问量过大`（重试也挤不进）、`1302 账户速率限制`（测试期自己打多了）。这是供应商侧容量问题，代码只能降级不能变出容量 |
 | 降级 | ✅ 失败时页面只留 4 秒小字（「模型这会儿排队 / AI 今天问得有点勤」），签筒照常可用 |
+
+### v5.11 换到百炼之后的实测
+
+| 项 | 结果 |
+|---|---|
+| 链路 | ✅ 环境变量重配后（国内站 compatible-mode + `qwen-flash`）一次跑通，`ok:true` |
+| 12 句体检 | ✅ 10/12 通过（「最近在减脂」「和爸妈一起吃」首次 `timeout`，重试即过），达到「≥10 句可接受」的门槛；「月底省钱」给面条粥、「体检别太油」给蒸菜凉拌、「庆祝」给红烧肉糖醋排骨，场景都对得上 |
+| 延迟 | ⚠️ 5.1–6.4s。`ms` 偏大是因为 4.2s 上限只卡「响应头」，正文生成不受它管；最坏一次 8402ms（两次各 4.2s 都没等到响应头） |
+| 请求体 | ✅ 单元测试 14/14：默认带 `enable_thinking:false` + `response_format:json_object`，被 400 拒绝后去掉重试且结论粘住，`Model not exist` 会落到下一个模型，无关 400 只打一次 |
+| 返回值 | ✅ 实际服务的是链上的 `qwen-flash`，12 道全部命中本地菜库 |
 
 ## 14. 部署
 
 - 部署产物就是仓库根目录的 `index.html`，**不需要构建**。
 - **正式地址走 Netlify**（连 GitHub 仓库，push 自动部署）：`https://gilded-griffin-5da339.netlify.app`。AI 筛选只在它上面可用。
   - 函数在 `netlify/functions/pick.mjs`，`netlify.toml` 把它挂到 `/api/pick`，Node 20（写 `[build.environment]` 的 `NODE_VERSION`，**不能**写成 `[functions]` 下的键——那里的子键会被当成函数名，校验报 "must be an object"）。
-  - 三个环境变量在 Netlify 后台设（Site configuration → Environment variables），**不进仓库**：`AI_KEY`（勾 Secret，值填在 Production 一栏）、`AI_BASE`、`AI_MODEL`；可选 `AI_MODELS` 做免费模型的候选链。
+  - 四个环境变量在 Netlify 后台设（Site configuration → Environment variables），**不进仓库**：`AI_KEY`（勾 Secret，值填在 Production 一栏）、`AI_BASE`、`AI_MODEL`；可选 `AI_MODELS` 做候选链。当前用的是阿里云百炼国内站：`AI_BASE=https://dashscope.aliyuncs.com/compatible-mode/v1`、`AI_MODEL=qwen-flash`。**改完必须重新部署**——变量是部署时注入函数的，不会热更新（曾经因为漏了这步，函数还在打智谱）。
   - 改模型只改环境变量，代码一行不动；改完等下一次部署生效。
 - Gitee Pages 保留为纯静态镜像：同一份 `index.html`，但按域名判断后不渲染 AI 入口，仍然零外部请求。推送后仍需在仓库页 → 服务 → Gitee Pages → 点「更新」。
 - 两个远端（`origin` = Gitee，`github` = GitHub）内容始终一致，每次同时推。
