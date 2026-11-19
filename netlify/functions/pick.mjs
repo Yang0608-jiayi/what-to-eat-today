@@ -221,7 +221,7 @@ const SYSTEM =
 
 /* 预览部署也要能用，所以放行 xxx--gilded-griffin-5da339.netlify.app */
 const OK_ORIGIN = /^https:\/\/([a-z0-9-]+--)?gilded-griffin-5da339\.netlify\.app$/;
-const TIMEOUT = 5000;
+const TIMEOUT = 6500;
 
 function json(body, status, cache) {
   const useCache = cache !== false;
@@ -270,32 +270,72 @@ export default async function handler(req) {
     return json({ ok: false, why: "config", miss: miss }, 200, false);
   }
 
-  const ctl = new AbortController();
-  const timer = setTimeout(function () { ctl.abort(); }, TIMEOUT);
+  /* 总共 6.5s 预算：单次最多 3s；429 / 5xx / 网络抖动再补一次。
+     免费模型高峰常回 1305（该模型并发过高），一次重试能救回大半。 */
+  const started = Date.now();
+  const budget = TIMEOUT;
+
+  async function once() {
+    const left = started + budget - Date.now();
+    const ctl = new AbortController();
+    const timer = setTimeout(function () { ctl.abort(); }, Math.max(600, Math.min(3000, left)));
+    try {
+      return await fetch(base + "/chat/completions", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer " + key
+        },
+        body: JSON.stringify({
+          model: model,
+          temperature: 0.2,
+          max_tokens: 400,
+          messages: [
+            { role: "system", content: SYSTEM },
+            { role: "user", content: q }
+          ]
+        }),
+        signal: ctl.signal
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   try {
-    const r = await fetch(base + "/chat/completions", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: "Bearer " + key
-      },
-      body: JSON.stringify({
-        model: model,
-        temperature: 0.2,
-        max_tokens: 400,
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: q }
-        ]
-      }),
-      signal: ctl.signal
-    });
-    clearTimeout(timer);
+    let r = null;
+    let detail = "";
+    let err = null;
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt) await new Promise(function (res) { setTimeout(res, 400); });
+      try {
+        r = await once();
+        err = null;
+      } catch (e) {
+        r = null;
+        err = e;
+      }
+      if (r && r.ok) break;
+      if (r && r.status !== 429 && r.status < 500) break;
+      if (r) {
+        /* 上游的错误正文里没有 key，截一段带回来，模型名写错时一眼能看出来 */
+        detail = (await r.text().catch(function () { return ""; })).slice(0, 240);
+      }
+      if (Date.now() + 900 > started + budget) break;
+    }
+
+    if (!r) {
+      const aborted = err && err.name === "AbortError";
+      return json({ ok: false, why: aborted ? "timeout" : "error", detail: String((err && err.message) || "") }, 200, false);
+    }
     if (!r.ok) {
-      /* 上游的错误正文里没有 key，截一段带回来，模型名写错时一眼能看出来 */
-      const detail = (await r.text().catch(function () { return ""; })).slice(0, 240);
-      return json({ ok: false, why: "upstream", status: r.status, detail: detail }, 200, false);
+      return json({
+        ok: false,
+        why: r.status === 429 ? "busy" : "upstream",
+        status: r.status,
+        detail: detail
+      }, 200, false);
     }
 
     const data = await r.json();
@@ -322,7 +362,6 @@ export default async function handler(req) {
       label: String(out.label || "").slice(0, 12)
     });
   } catch (e) {
-    clearTimeout(timer);
-    return json({ ok: false, why: e && e.name === "AbortError" ? "timeout" : "error", detail: String(e && e.message || "") }, 200, false);
+    return json({ ok: false, why: e && e.name === "AbortError" ? "timeout" : "error", detail: String((e && e.message) || "") }, 200, false);
   }
 }

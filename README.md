@@ -134,7 +134,8 @@ https://你的站点.netlify.app/api/pick?q=感冒了
   - `config` → 环境变量没配齐，`miss` 里列出缺哪个（key 的值永远不会回显）
   - `upstream` → 供应商返回非 2xx，`status` + `detail` 是它的原文（模型名写错最常见）
   - `parse` / `few` → 模型答得不是 JSON，或有效菜名不足 3 道
-  - `timeout` / `error` → 5 秒超时或网络异常
+  - `busy` → 上游 429（免费模型高峰并发过高）；函数已自动再试一次，还挤不进去就退回全部菜
+  - `timeout` / `error` → 总共 6.5 秒预算用完，或网络异常
 - 仍然排除不了就看 Netlify → Functions → `pick` → 日志。
 
 ### 改菜库之后
@@ -210,7 +211,7 @@ EdgeOne Makers 就是 2026-06 更名后的 EdgeOne Pages，静态资源**不需�
 | AI 入口在哪些域名出现 | 搜索 `var AI =` 那一行的正则；Gitee 上不匹配就整颗按钮都不渲染 |
 | AI 的提示词与规则 | `netlify/functions/pick.mjs` 的 `SYSTEM`（菜库那段由脚本生成，别手改） |
 | AI 一次挑几道 | `SYSTEM` 里的「6 到 12 道」，以及函数返回前的 `slice(0, 12)` |
-| AI 的超时（默认 5 秒） | 函数里的 `var TIMEOUT` 与页面里的 `AI_TIMEOUT`，两边要一致 |
+| AI 的超时（函数 6.5 秒、页面 7 秒） | 函数里的 `const TIMEOUT` 与页面里的 `AI_TIMEOUT`；页面必须略大，否则请求还没回来就被自己掐断。单次尝试上限 3 秒，429/5xx 自动再试一次 |
 | AI 结果缓存多久 | 函数响应头的 `s-maxage=86400`（CDN）与页面里的 `AI_CACHE_TTL`（本地） |
 | 纸片里的示例句 | 搜索 `sheet-egs`，改 `data-q` |
 
