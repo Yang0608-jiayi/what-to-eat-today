@@ -428,6 +428,9 @@
     transition:opacity .3s var(--ease);
   }
   .hint.on{opacity:1}
+  /* AI 条件借用这一行显示：它在提示本来为空时出现，所以不占任何额外高度 */
+  .hint.ai{opacity:1;color:var(--teal-deep);cursor:pointer}
+  .hint.ai:hover{text-decoration:underline;text-underline-offset:3px}
 
   /* ── 玩法二：划掉 ─────────────────── */
   .elim-lead,
@@ -709,6 +712,87 @@
   .sound:hover{opacity:1;color:var(--ink-soft)}
   .sound svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 
+  /* ── AI 入口（只在 Netlify 域名渲染，Gitee Pages 上整颗按钮都不存在）── */
+  .ai-btn{
+    position:absolute;
+    right:40px;
+    top:50%;
+    margin-top:-20px;
+    width:40px;
+    height:40px;
+    display:grid;
+    place-items:center;
+    border:0;
+    background:none;
+    color:var(--muted);
+    opacity:.5;
+    cursor:pointer;
+    transition:opacity .2s,color .2s;
+  }
+  .ai-btn[hidden]{display:none}
+  .ai-btn:hover{opacity:1;color:var(--ink-soft)}
+  .ai-btn.on{opacity:1;color:var(--teal-deep)}
+  .ai-btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+  /* 有 AI 条件时右上角一个点，不占布局 */
+  .ai-btn.on::after{
+    content:"";
+    position:absolute;
+    right:8px;
+    top:8px;
+    width:5px;
+    height:5px;
+    border-radius:50%;
+    background:var(--teal-deep);
+  }
+
+  /* ── “说一句”纸片：固定定位，不参与页面流 ── */
+  .sheet{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-end;justify-content:center}
+  .sheet[hidden]{display:none}
+  .sheet-mask{position:absolute;inset:0;background:rgba(43,38,34,.34);animation:mask-in .18s ease}
+  @keyframes mask-in{from{opacity:0}to{opacity:1}}
+  .sheet-panel{
+    position:relative;
+    width:100%;
+    max-width:680px;
+    padding:22px 20px calc(20px + env(safe-area-inset-bottom));
+    background:var(--paper-hi);
+    border-radius:14px 14px 0 0;
+    box-shadow:0 -14px 34px -26px rgba(43,38,34,.6);
+    animation:sheet-in .22s var(--ease);
+  }
+  @keyframes sheet-in{from{transform:translateY(14px);opacity:0}to{transform:translateY(0);opacity:1}}
+  .sheet-title{margin:0 0 14px;font-size:13px;letter-spacing:.12em;color:var(--ink);text-align:center}
+  .sheet-input{
+    width:100%;
+    height:44px;
+    padding:0 14px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:#fff;
+    color:var(--ink);
+    font-family:inherit;
+    font-size:13px;
+    letter-spacing:.02em;
+  }
+  .sheet-input::placeholder{color:var(--muted)}
+  .sheet-input:focus{outline:none;border-color:rgba(69,149,142,.55)}
+  .sheet-egs{display:flex;gap:8px;margin:10px 0 18px}
+  .sheet-egs button{
+    height:28px;
+    padding:0 11px;
+    border:1px solid var(--line);
+    border-radius:999px;
+    background:none;
+    color:var(--ink-soft);
+    font-family:inherit;
+    font-size:11.5px;
+    cursor:pointer;
+  }
+  .sheet-egs button:hover{border-color:rgba(69,149,142,.4)}
+  .sheet-go{width:100%}
+  .sheet-clear{margin:14px auto 0;display:block}
+  .sheet-clear[hidden]{display:none}
+
   .sr-only{
     position:absolute;
     width:1px;height:1px;
@@ -767,6 +851,11 @@
         <svg id="soundIcon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M4 9v6h4l5 4V5L8 9H4z"/>
           <path id="waves" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>
+        </svg>
+      </button>
+      <button class="ai-btn" id="aiBtn" aria-label="用一句话筛菜" title="说说现在的情况" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 8h14M5 12h10M5 16h6"/>
         </svg>
       </button>
     </div>
@@ -875,6 +964,22 @@
 
     <p class="hint" id="hint"></p>
     <div class="sr-only" aria-live="polite" id="live"></div>
+  </div>
+</div>
+
+<div class="sheet" id="aiSheet" hidden>
+  <div class="sheet-mask" id="aiMask"></div>
+  <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="aiTitle">
+    <p class="sheet-title" id="aiTitle">说说现在的情况</p>
+    <input class="sheet-input" id="aiInput" type="text" maxlength="60" autocomplete="off"
+           enterkeyhint="go" placeholder="比如：感冒了，想吃点热乎的">
+    <div class="sheet-egs">
+      <button type="button" data-q="加班到九点，想吃点热乎的">加班到九点</button>
+      <button type="button" data-q="感冒了">感冒了</button>
+      <button type="button" data-q="月底了，省点钱">月末省钱</button>
+    </div>
+    <button class="btn" id="aiGo">帮我筛</button>
+    <button class="link sheet-clear" id="aiClear" hidden>清除条件，回到全部菜</button>
   </div>
 </div>
 
@@ -1100,6 +1205,14 @@
   var soundBtn  = document.getElementById("sound");
   var wavesEl   = document.getElementById("waves");
 
+  /* AI 筛选（只在 Netlify 部署启用：页面与函数同源） */
+  var aiBtn     = document.getElementById("aiBtn");
+  var aiSheet   = document.getElementById("aiSheet");
+  var aiMask    = document.getElementById("aiMask");
+  var aiInput   = document.getElementById("aiInput");
+  var aiGo      = document.getElementById("aiGo");
+  var aiClear   = document.getElementById("aiClear");
+
   var cardsEl   = document.getElementById("cards");
   var elimCount = document.getElementById("elimCount");
   var elimPrimary = document.getElementById("elimPrimary");
@@ -1133,6 +1246,16 @@
     try{ navigator.vibrate(ms); }catch(e){}
   }
 
+  /* ───────── AI：一句话 → 候选池 ───────── */
+  /* 函数和页面同源，所以是相对路径；Gitee Pages 上没有这个接口，
+     按域名判断后连入口都不渲染，那个地址仍然零请求。换自定义域名改这里。 */
+  var AI = /\.netlify\.app$/.test(location.hostname) ? "/api/pick" : "";
+  var AI_TIMEOUT = 5000;
+  var AI_CACHE = "jtsmc.ai.";
+  var AI_CACHE_TTL = 24 * 3600 * 1000;
+  var DISH_BY_NAME = {};
+  DISHES.forEach(function(d){ DISH_BY_NAME[d.name] = d; });
+
   var S = {
     view: (function(){
       var v = read("jtsmc.view", "sign");
@@ -1147,6 +1270,7 @@
     rolled: [],
     undone: read("jtsmc.undone", []) || [],
     exclude: [],
+    ai: null,
     rollCount: 0,
     outletUsed: false,
     relaxMsg: ""
@@ -1417,26 +1541,41 @@
     return true;
   }
 
+  /* AI 条件生效时，先把它挑的池子当底座，chip / 排除集仍在上面做交集 */
+  function aiBase(){
+    if (!S.ai) return DISHES;
+    var set = S.ai.names;
+    return DISHES.filter(function(d){ return set.indexOf(d.name) > -1; });
+  }
+
   /* 条件让步：先放「想吃面」，再放「清淡点」，硬忌口永不放宽 */
   function candidates(){
     var gentle = S.gentle, noodle = S.noodle, msg = "";
-    var pool = DISHES.filter(function(d){ return match(d, S.noSpicy, gentle, noodle); });
+    var base = aiBase();
+    var pool = base.filter(function(d){ return match(d, S.noSpicy, gentle, noodle); });
 
     if (!pool.length && noodle){
       noodle = false;
-      pool = DISHES.filter(function(d){ return match(d, S.noSpicy, gentle, noodle); });
+      pool = base.filter(function(d){ return match(d, S.noSpicy, gentle, noodle); });
       msg = "没有完全符合的，帮你放开了「想吃面」";
     }
     if (!pool.length && gentle){
       gentle = false;
-      pool = DISHES.filter(function(d){ return match(d, S.noSpicy, gentle, noodle); });
+      pool = base.filter(function(d){ return match(d, S.noSpicy, gentle, noodle); });
       msg = "没有完全符合的，帮你放开了「清淡点」";
     }
     /* 长按排除到无解时的兜底：清空排除集，保证永远摇得出来 */
     if (!pool.length && S.exclude.length){
       S.exclude = [];
-      pool = DISHES.filter(function(d){ return match(d, S.noSpicy, gentle, noodle); });
+      pool = base.filter(function(d){ return match(d, S.noSpicy, gentle, noodle); });
       msg = "排到没得选了，重新来过";
+    }
+    /* AI 的池子被上面的条件削到只剩一道：撤掉 AI 条件，回到全库 */
+    if (S.ai && pool.length < 2){
+      S.ai = null;
+      syncAI();
+      pool = DISHES.filter(function(d){ return match(d, S.noSpicy, gentle, noodle); });
+      msg = "AI 挑的几道都被条件挡掉了，先用全部";
     }
     return { pool: pool, msg: msg };
   }
@@ -1473,9 +1612,17 @@
     chips.classList.toggle("faded", !!v);
   }
 
+  function aiHintText(){
+    return S.ai ? ("AI 挑了 " + S.ai.names.length + " 道 · 点这里改条件") : "";
+  }
+
+  /* 提示行本来就有 1.5em 的固定高度，AI 条件借它显示 → 不占额外空间。
+     有临时消息时消息优先，消息清空后条件自动回来。 */
   function setHint(text){
-    hintEl.textContent = text || "";
-    hintEl.classList.toggle("on", !!text);
+    var t = text || aiHintText();
+    hintEl.textContent = t;
+    hintEl.classList.toggle("on", !!t);
+    hintEl.classList.toggle("ai", !text && !!S.ai);
   }
 
   /* ───────── 一餐：主食推导 / 汤 / 加菜 ───────── */
@@ -1768,9 +1915,20 @@
     var list = remaining(pool, ignoreRolled);
 
     if (!list.length){
-      rolling = false;
-      toExhausted();
-      return;
+      /* AI 挑的这几道今天都摇过了：撤掉条件再摇，别直接判“签尽” */
+      if (S.ai){
+        S.ai = null;
+        syncAI();
+        c = candidates();
+        pool = c.pool;
+        list = remaining(pool, ignoreRolled);
+        c.msg = "AI 挑的都吃过了，放开到全部";
+      }
+      if (!list.length){
+        rolling = false;
+        toExhausted();
+        return;
+      }
     }
 
     setState("rolling");
@@ -2032,7 +2190,7 @@
 
     E.winner = null;
     var ds = dealCards();
-    if (!ds.length) ds = shuffle(DISHES.slice()).slice(0, CARD_COUNT);
+    if (!ds.length) ds = shuffle(candidates().pool.slice()).slice(0, CARD_COUNT);
     E.cards = ds.map(function(d){ return { d: d, off: false }; });
     setEstate("pick");
     renderCards();
@@ -2677,20 +2835,154 @@
     });
   });
 
-  /* 结果 / 签尽状态下改条件：作废当前画面，回到待摇，不自动重摇 */
+  /* 结果 / 签尽状态下改条件：作废当前画面，回到待摇，不自动重摇。
+     另外两个玩法也必须跟着重发牌，否则切过去会看到不合新条件的牌。 */
   function afterChipChange(){
-    if (S.view === "elim"){
-      if (E.state === "draw") return;
-      elimReset();
-      return;
-    }
-    if (S.view === "pk"){
-      if (P.busy) return;
-      pkDeal();
-      return;
-    }
+    if (S.view === "elim" && E.state === "draw") return;
+    if (S.view === "pk" && P.busy) return;
+
     if (S.state === "result" || S.state === "exhausted") toIdle();
+    if (E.state !== "draw" && E.state !== "accepted") elimReset();
+    if (!P.busy && P.state !== "accepted") pkDeal();
   }
+
+  /* ───────── AI 筛选 ───────── */
+  function syncAI(){
+    aiBtn.hidden = !AI;
+    aiBtn.classList.toggle("on", !!S.ai);
+    aiBtn.setAttribute("aria-label",
+      S.ai ? ("AI 条件：" + S.ai.label + "，点这里修改") : "用一句话筛菜");
+    aiClear.hidden = !S.ai;
+  }
+
+  function aiCacheKey(q){ return AI_CACHE + q; }
+
+  /* 四级降级：本地缓存 → 请求 → 超时/坏 JSON → 全库。任何一步失败都只回 null */
+  function askAI(q, done){
+    if (!AI){ done(null); return; }
+    try {
+      var hit = localStorage.getItem(aiCacheKey(q));
+      if (hit){
+        var c = JSON.parse(hit);
+        if (c && c.ok && c.dishes && c.dishes.length >= 2 && Date.now() - (c.t || 0) < AI_CACHE_TTL){
+          done(c);
+          return;
+        }
+      }
+    } catch(e){}
+
+    var ctl = window.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function(){ if (ctl) ctl.abort(); }, AI_TIMEOUT);
+
+    fetch(AI + "?q=" + encodeURIComponent(q), ctl ? { signal: ctl.signal } : {})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        clearTimeout(timer);
+        if (!d || !d.ok || !d.dishes){ done(null); return; }
+        /* 服务端已经校验过一遍，客户端再挡一次：菜名必须在本地菜库里 */
+        var names = d.dishes.filter(function(n){ return !!DISH_BY_NAME[n]; });
+        if (names.length < 2){ done(null); return; }
+        var res = { ok: true, dishes: names, label: String(d.label || ""), t: Date.now() };
+        try { localStorage.setItem(aiCacheKey(q), JSON.stringify(res)); } catch(e){}
+        done(res);
+      })
+      .catch(function(){ clearTimeout(timer); done(null); });
+  }
+
+  function applyAI(res, q){
+    S.ai = {
+      label: (res.label || q || "刚刚说的").slice(0, 12),
+      names: res.dishes
+    };
+    syncAI();
+    afterChipChange();
+    setHint("");
+    playTick(true);
+    vibrate(8);
+    liveEl.textContent = "AI 挑了 " + res.dishes.length + " 道";
+  }
+
+  function clearAI(){
+    if (!S.ai) return;
+    S.ai = null;
+    syncAI();
+    afterChipChange();
+    setHint("");
+    playTick(false);
+    liveEl.textContent = "回到全部菜";
+  }
+
+  function openSheet(){
+    if (!AI) return;
+    aiSheet.hidden = false;
+    syncAI();
+    setTimeout(function(){ aiInput.focus(); }, 40);
+  }
+
+  function closeSheet(){
+    if (aiSheet.hidden) return;
+    aiSheet.hidden = true;
+    aiBtn.focus();
+  }
+
+  function runAI(){
+    var q = aiInput.value.trim();
+    if (!q || aiGo.disabled) return;
+    aiGo.disabled = true;
+    aiGo.textContent = "正在看菜谱…";
+    askAI(q, function(res){
+      aiGo.disabled = false;
+      aiGo.textContent = "帮我筛";
+      closeSheet();
+      if (res){
+        applyAI(res, q);
+      } else {
+        setHint("这次没筛成，先用全部菜");
+        setTimeout(function(){
+          if (!S.ai && hintEl.textContent === "这次没筛成，先用全部菜") setHint("");
+        }, 4000);
+      }
+    });
+  }
+
+  /* 打完字停 1.2 秒就先问一次，进缓存；点“帮我筛”时通常已经回来了 */
+  var composing = false, prefetchTimer = 0;
+  function schedulePrefetch(){
+    if (composing) return;
+    clearTimeout(prefetchTimer);
+    var q = aiInput.value.trim();
+    if (q.length < 2) return;
+    prefetchTimer = setTimeout(function(){ askAI(q, function(){}); }, 1200);
+  }
+
+  aiBtn.addEventListener("click", openSheet);
+  aiMask.addEventListener("click", closeSheet);
+  aiGo.addEventListener("click", runAI);
+  aiClear.addEventListener("click", function(){ clearAI(); closeSheet(); });
+
+  [].forEach.call(aiSheet.querySelectorAll(".sheet-egs button"), function(b){
+    b.addEventListener("click", function(){
+      aiInput.value = b.getAttribute("data-q");
+      aiInput.focus();
+      schedulePrefetch();
+    });
+  });
+
+  aiInput.addEventListener("compositionstart", function(){ composing = true; });
+  aiInput.addEventListener("compositionend", function(){ composing = false; schedulePrefetch(); });
+  aiInput.addEventListener("input", schedulePrefetch);
+  aiInput.addEventListener("keydown", function(e){
+    if (e.key === "Enter"){ e.preventDefault(); runAI(); }
+  });
+
+  /* 提示行在“AI 条件”状态下可点，打开同一张纸片去改 */
+  hintEl.addEventListener("click", function(){
+    if (hintEl.classList.contains("ai")) openSheet();
+  });
+
+  document.addEventListener("keydown", function(e){
+    if (e.key === "Escape" && !aiSheet.hidden) closeSheet();
+  });
 
   chipNoSpicy.addEventListener("click", function(){
     if (rolling) return;
@@ -2735,6 +3027,7 @@
   syncDay();
   syncChips();
   syncSound();
+  syncAI();
   toIdle();
   elimReset();
   pkDeal();

@@ -1,1 +1,5 @@
 dist/
+
+# 本地环境变量永远不进仓库（key 只存在 Netlify 后台）
+.env
+.env.*

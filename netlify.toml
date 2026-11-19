@@ -1,0 +1,11 @@
+# 页面仍是根目录的单个 index.html，没有构建步骤。
+# 这里只做两件事：把函数目录指明白，以及把 /api/pick 变成短路径。
+
+[functions]
+  directory = "netlify/functions"
+  node_version = "20"
+
+[[redirects]]
+  from = "/api/pick"
+  to = "/.netlify/functions/pick"
+  status = 200
