@@ -1529,7 +1529,7 @@
      Gitee Pages 上没有这个接口，按域名判断后连入口都不渲染，那个地址仍然零请求。
      放行正式域名、www，以及 Pages 的预览域名；换域名时改这里和函数里的 OK_HOSTS。 */
   var AI = /(^|\.)(whatfood\.top|what-to-eat-today-b0r\.pages\.dev)$/.test(location.hostname) ? "/api/pick" : "";
-  var AI_TIMEOUT = 22000;
+  var AI_TIMEOUT = 18000;
   var AI_CACHE = "jtsmc.ai.";
   var AI_CACHE_TTL = 24 * 3600 * 1000;
   var DISH_BY_NAME = {};

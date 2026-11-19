@@ -113,6 +113,7 @@ git push github v4.2
 | `v5.11` | 请求体加 `enable_thinking:false` + `response_format:json_object`；`max_tokens` 256→192；被 400 拒绝时自动降级；模型不存在的判据扩展到 `Model not exist` / `model_not_found` |
 | `v6.0` | 菜库 180 → 450；校验阈值改比例；新增 `tools/md-dishes.mjs` 生成 `dishes.md` |
 | `v6.1` | 部署迁到 Cloudflare Pages（`whatfood.top`）：新增 `functions/api/pick.js`，缓存改用 Cache API，`sync-ai` 同时同步两份函数 |
+| `v6.2` | AI 超时按实测重定：单次 4.2s → 9s、总预算 9s → 16s、页面 10.5s → 18s（跨境延迟实测 1.8–9.7s） |
 
 ## 本地预览
 
@@ -142,7 +143,7 @@ Cloudflare 控制台 → 你的 Pages 项目 → Settings → **Variables and se
 
 - 配了 `AI_MODELS` 就严格按它走；
 - 只配了 `AI_MODEL`、且 `AI_BASE` 是智谱（`bigmodel.cn`）时，自动接上 `glm-4-flash-250414`、`glm-4.5-flash` 兜底（小而快的排前面）；
-- 排队（1305）/ 模型不存在（智谱 `1211`/`1214`、DashScope `Model not exist`、OpenAI `model_not_found`）/ 5xx / **超时** 都换下一个（单次最多 4.2 秒，不在一个慢模型上等死）；账户限流（1302）和 key 错（401）立刻收手，换模型没用。
+- 排队（1305）/ 模型不存在（智谱 `1211`/`1214`、DashScope `Model not exist`、OpenAI `model_not_found`）/ 5xx / **超时** 都换下一个（单次最多 9 秒，不在一个慢模型上等死）；账户限流（1302）和 key 错（401）立刻收手，换模型没用。
 
 **请求体额外带两个可选参数**（v5.11）：
 
@@ -170,7 +171,7 @@ https://whatfood.top/api/pick?q=感冒了
   - `parse` / `few` → 模型答得不是 JSON，或有效菜名不足 3 道
   - `busy` → 上游 429（模型侧排队，1305）；函数已自动再试一次，还挤不进去就退回全部菜
   - `rate` → 上游 429（账户频率限制，1302）；这时**不要重试**，等一分钟即可
-  - `timeout` / `error` → 9 秒预算用完，或网络异常
+  - `timeout` / `error` → 16 秒预算用完，或网络异常
 - 仍然排除不了就看 Cloudflare → Pages 项目 → **Functions → 实时日志**（Real-time logs）。
 
 ### 改菜库之后
@@ -251,7 +252,7 @@ node tools/sync-ai.mjs --check   # 只检查，不一致就报错
 | AI 入口在哪些域名出现 | 搜索 `var AI =` 那一行的正则；Gitee 上不匹配就整颗按钮都不渲染。改了域名要同步函数里的 `OK_HOSTS` |
 | AI 的提示词与规则 | `functions/api/pick.js` 的 `SYSTEM`（菜库那段由脚本生成，别手改） |
 | AI 一次挑几道 | `SYSTEM` 里的「6 到 12 道」，以及函数返回前的 `slice(0, 12)` |
-| AI 的超时（函数 9 秒、页面 10.5 秒） | 函数里的 `const TIMEOUT` 与页面里的 `AI_TIMEOUT`；页面必须略大，否则请求还没回来就被自己掐断。单次尝试上限 4.2 秒，超时直接换下一个模型 |
+| AI 的超时（函数 16 秒、页面 18 秒） | 函数里的 `const TIMEOUT` 与页面里的 `AI_TIMEOUT`；页面必须略大，否则请求还没回来就被自己掐断。单次尝试上限 9 秒，超时直接换下一个模型 |
 | AI 请求体（关思考 / 强制 JSON） | `functions/api/pick.js` 里 `once()` 组装的那个 `body`；被上游 400 拒绝会自动去掉重试，见 `NO_THINKING` / `NO_JSON_MODE` |
 | AI 结果缓存多久 | 函数里的 `CACHE_TTL`（Cache API，24h，成功才缓存）与页面里的 `AI_CACHE_TTL`（本地） |
 | 纸片里的示例句 | 搜索 `sheet-egs`，改 `data-q` |

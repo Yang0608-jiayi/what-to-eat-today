@@ -512,7 +512,7 @@ function originAllowed(origin) {
   }
 }
 
-const TIMEOUT = 20000;
+const TIMEOUT = 16000;
 const CACHE_TTL = 86400;
 
 /* 下面两个是可选的请求参数，不是每家供应商都认。被 400 明确拒绝过一次就记住，
