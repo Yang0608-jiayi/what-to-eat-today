@@ -9,6 +9,7 @@
  *   3. 返回的菜名必须真的在菜库里，3–12 道，否则整条作废
  *
  * 环境变量：AI_KEY / AI_BASE / AI_MODEL（在 Netlify 后台设，不进仓库）
+ *           AI_MODELS 可选，逗号分隔的候选链；不设时智谱 base 会自动接两个免费型号兜底
  * 菜库：由 tools/sync-ai.mjs 从 index.html 同步，不要手改下面 DISHES 段
  */
 
@@ -263,21 +264,37 @@ export default async function handler(req) {
 
   const base = (process.env.AI_BASE || "").replace(/\/+$/, "");
   const key = process.env.AI_KEY || "";
-  const model = process.env.AI_MODEL || "";
+  const primary = process.env.AI_MODEL || "";
   /* why 只说明缺了哪一项，绝不回显值——key 永远是黑的 */
-  if (!base || !key || !model) {
-    const miss = [!base && "AI_BASE", !key && "AI_KEY", !model && "AI_MODEL"].filter(Boolean);
+  if (!base || !key || !primary) {
+    const miss = [!base && "AI_BASE", !key && "AI_KEY", !primary && "AI_MODEL"].filter(Boolean);
     return json({ ok: false, why: "config", miss: miss }, 200, false);
   }
 
-  /* 总共 8.5s 预算，单次最多 7s。超时说明模型此刻就是慢，不再重来；
-     只有 1305（模型侧排队）/ 5xx / 网络错误才补一次，并且必须还剩 2.6s 以上。 */
+  /* 免费模型的高峰经常整条排队（1305），所以准备一个候选链：
+     AI_MODELS 用逗号分隔可完全自定义；智谱 base 下只配了一个模型时，
+     自动接上另外两个免费文本模型兜底。 */
+  let models = (process.env.AI_MODELS || "")
+    .split(",")
+    .map(function (s) { return s.trim(); })
+    .filter(Boolean);
+  if (!models.length) {
+    models = [primary];
+    if (/bigmodel\.cn/i.test(base)) {
+      ["glm-4.5-flash", "glm-4-flash-250414"].forEach(function (m) {
+        if (models.indexOf(m) < 0) models.push(m);
+      });
+    }
+  }
+
+  /* 总共 8.5s 预算，单次最多 7s。超时说明这个模型此刻就是慢，不再等第二个；
+     1305（排队）/ 1211（模型不存在）/ 5xx / 网络错误才换下一个模型。 */
   const started = Date.now();
   const budget = TIMEOUT;
   const ATTEMPT = 7000;
   const ms = function () { return Date.now() - started; };
 
-  async function once() {
+  async function once(name) {
     const left = started + budget - Date.now();
     const ctl = new AbortController();
     const timer = setTimeout(function () { ctl.abort(); }, Math.max(800, Math.min(ATTEMPT, left)));
@@ -289,7 +306,7 @@ export default async function handler(req) {
           authorization: "Bearer " + key
         },
         body: JSON.stringify({
-          model: model,
+          model: name,
           temperature: 0.2,
           max_tokens: 400,
           messages: [
@@ -308,34 +325,46 @@ export default async function handler(req) {
     let r = null;
     let detail = "";
     let err = null;
+    let used = "";
 
-    for (let attempt = 0; attempt < 2; attempt++) {
-      if (attempt) {
-        if (Date.now() + 2600 > started + budget) break;
-        await new Promise(function (res) { setTimeout(res, 350); });
+    outer:
+    for (let mi = 0; mi < models.length; mi++) {
+      used = models[mi];
+      for (let attempt = 0; attempt < 2; attempt++) {
+        if (attempt) {
+          if (Date.now() + 2600 > started + budget) break outer;
+          await new Promise(function (res) { setTimeout(res, 300); });
+        }
+        try {
+          r = await once(used);
+          err = null;
+        } catch (e) {
+          r = null;
+          err = e;
+        }
+        if (r && r.ok) break outer;
+
+        if (r) {
+          /* 上游的错误正文里没有 key，截一段带回来，模型名写错时一眼能看出来 */
+          detail = (await r.text().catch(function () { return ""; })).slice(0, 240);
+          /* 1302 是账户限流，换模型也没用，越试越糟 */
+          if (r.status === 429 && detail.indexOf("1302") > -1) break outer;
+          /* 1211 / 1214 = 模型不存在或不支持：换下一个；其他 4xx（钥匙错、参数错）换也没用 */
+          const modelMissing = /"code"\s*:\s*"12(11|14)"/.test(detail);
+          if (r.status < 500 && r.status !== 429 && !modelMissing) break outer;
+          /* 排队 / 5xx / 模型不存在 → 下一个模型 */
+          break;
+        }
+        /* 超时：模型太慢，剩下的预算也不够再等一个 */
+        if (err && err.name === "AbortError") break outer;
+        /* 网络错误是瞬时的，同一个模型再试一次 */
       }
-      try {
-        r = await once();
-        err = null;
-      } catch (e) {
-        r = null;
-        err = e;
-      }
-      if (r && r.ok) break;
-      if (r) {
-        /* 上游的错误正文里没有 key，截一段带回来，模型名写错时一眼能看出来 */
-        detail = (await r.text().catch(function () { return ""; })).slice(0, 240);
-        /* 非 429 / 5xx 的错误，换一次也不会好；1302 是账户限流，越试越糟 */
-        if (r.status !== 429 && r.status < 500) break;
-        if (r.status === 429 && detail.indexOf("1302") > -1) break;
-      } else if (err && err.name === "AbortError") {
-        break;
-      }
+      if (Date.now() + 1200 > started + budget) break;
     }
 
     if (!r) {
       const aborted = err && err.name === "AbortError";
-      return json({ ok: false, why: aborted ? "timeout" : "error", ms: ms(), detail: String((err && err.message) || "") }, 200, false);
+      return json({ ok: false, why: aborted ? "timeout" : "error", ms: ms(), model: used, detail: String((err && err.message) || "") }, 200, false);
     }
     if (!r.ok) {
       const rate = detail.indexOf("1302") > -1;
@@ -344,6 +373,8 @@ export default async function handler(req) {
         why: rate ? "rate" : (r.status === 429 ? "busy" : "upstream"),
         status: r.status,
         ms: ms(),
+        model: used,
+        tried: models,
         detail: detail
       }, 200, false);
     }
@@ -370,6 +401,7 @@ export default async function handler(req) {
       ok: true,
       dishes: dishes.slice(0, 12),
       label: String(out.label || "").slice(0, 12),
+      model: used,
       ms: ms()
     });
   } catch (e) {

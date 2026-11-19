@@ -377,6 +377,7 @@
 | 撤销 | 点那一行 → 纸片里「清除条件，回到全部菜」；刷新页面也会清 |
 
 - **四级降级**：本地缓存（24h）→ 请求 → 超时 / 坏 JSON / 额度耗尽 → 静默退回 180 道，只留 4 秒小字「这次没筛成，先用全部菜」。任何一步失败都不弹错误、不卡住。
+- **模型候选链（v5.8）**：免费模型高峰会整条排队（1305 该模型当前访问量过大）。`AI_MODELS` 可配逗号链；未配且 `AI_BASE` 是智谱时自动接 `glm-4.5-flash`、`glm-4-flash-250414`。排队 / 模型不存在（1211、1214）/ 5xx 换下一个；**账户限流（1302）与 key 错（401）立刻收手**——换模型不会变好，只会更糟。超时不换下一个（剩下的预算也不够再等一轮）。失败响应带 `model`（最后试的那个）与 `tried`（整条链），便于判断是不是模型名写错。
 - **条件冲突自动让位**：AI 池被 chip 削到只剩 1 道时撤掉 AI 条件并提示；AI 池今天都摇过了就撤掉条件再摇，不判「今日签已尽」。
 - **三种玩法共用**：`candidates()` 是唯一入口，摇签 / 划掉 / 二选一都从同一个池子出牌；改条件后另外两个玩法也会重发牌（v5.0 顺带修了这个既有问题）。
 - **key 为什么不在页面里**：浏览器能读到的东西就等于公开。key 只存在于 Netlify 的环境变量；代理只接受一句 `q`，**不接受 `messages`**，system prompt 与服务端菜库固定——否则就成了免费通用 API。返回的菜名还要过一遍服务端白名单。
@@ -1057,6 +1058,8 @@ Configuration property functions.node_version must be an object.
 | `v5.4` | 区分 429 的两种含义：1302 是账户限流（**不重试**，越试越糟），1305 是模型侧排队（值得再试一次）；新增 `rate` 语气 |
 | `v5.5` | 文档：把上面这些写进 PRD（真因、改动、实测） |
 | `v5.6` | 预算放宽到 8.5s（页面 9.5s）、单次 7s；**超时不再重试**（重来只会更慢），只对排队 / 5xx / 网络错误补一次；成功与失败都带 `ms`，一眼看出模型有多慢 |
+| `v5.7` | `tools/sync-ai.mjs` 先归一化 CRLF 再比较（Windows 检出会误报「菜库不同步」）；新增 `.gitattributes` 把 `*.mjs` / `*.toml` 锁成 LF |
+| `v5.8` | **模型候选链**：`AI_MODELS` 可配，未配时智谱 base 自动接 `glm-4.5-flash`、`glm-4-flash-250414`；排队（1305）/ 模型不存在（1211）/ 5xx 换下一个，账户限流（1302）与 401 立刻收手；失败响应带 `model` + `tried` |
 
 实测：
 
@@ -1073,7 +1076,7 @@ Configuration property functions.node_version must be an object.
 - 部署产物就是仓库根目录的 `index.html`，**不需要构建**。
 - **正式地址走 Netlify**（连 GitHub 仓库，push 自动部署）：`https://gilded-griffin-5da339.netlify.app`。AI 筛选只在它上面可用。
   - 函数在 `netlify/functions/pick.mjs`，`netlify.toml` 把它挂到 `/api/pick`，Node 20（写 `[build.environment]` 的 `NODE_VERSION`，**不能**写成 `[functions]` 下的键——那里的子键会被当成函数名，校验报 "must be an object"）。
-  - 三个环境变量在 Netlify 后台设（Site configuration → Environment variables），**不进仓库**：`AI_KEY`（勾 Secret，值填在 Production 一栏）、`AI_BASE`、`AI_MODEL`。
+  - 三个环境变量在 Netlify 后台设（Site configuration → Environment variables），**不进仓库**：`AI_KEY`（勾 Secret，值填在 Production 一栏）、`AI_BASE`、`AI_MODEL`；可选 `AI_MODELS` 做免费模型的候选链。
   - 改模型只改环境变量，代码一行不动；改完等下一次部署生效。
 - Gitee Pages 保留为纯静态镜像：同一份 `index.html`，但按域名判断后不渲染 AI 入口，仍然零外部请求。推送后仍需在仓库页 → 服务 → Gitee Pages → 点「更新」。
 - 两个远端（`origin` = Gitee，`github` = GitHub）内容始终一致，每次同时推。

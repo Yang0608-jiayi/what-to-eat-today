@@ -104,6 +104,8 @@ git push github v4.2
 | `v5.4` | 区分账户限流（1302）与模型排队（1305）：限流不再重试，另给 `rate` 语气 |
 | `v5.5` | 文档：部署失败真因与 v5.1–v5.4 改动、实测 |
 | `v5.6` | 预算 8.5s / 9.5s、单次 7s；超时不再重试；响应带 `ms` 便于看延迟 |
+| `v5.7` | 单次放宽到 7s（总线 8.5s）；修 Windows 检出 CRLF 导致 `sync-ai --check` 误报 |
+| `v5.8` | 模型候选链：排队/不存在/5xx 自动换下一个免费模型，可配 `AI_MODELS` |
 
 ## 本地预览
 
@@ -123,9 +125,16 @@ Netlify 后台 → Site configuration → Environment variables，建三个：
 |---|---|---|
 | `AI_KEY` | 供应商给的 key | ✅ 勾上（值填在 **Production** 一栏，其余留空） |
 | `AI_BASE` | 例 `https://open.bigmodel.cn/api/paas/v4` | ⬜ |
-| `AI_MODEL` | 例 `glm-4.5-flash`（以控制台里的免费型号为准） | ⬜ |
+| `AI_MODEL` | 例 `glm-4.7-flash`（以控制台里的免费型号为准） | ⬜ |
+| `AI_MODELS` | 可选。逗号分隔的候选链，如 `glm-4.7-flash,glm-4.5-flash` | ⬜ |
 
-换供应商只改这两个变量，代码一行不动。改完等下一次 push 触发的部署生效。
+**免费模型会排队**，所以函数自带一条候选链：
+
+- 配了 `AI_MODELS` 就严格按它走；
+- 只配了 `AI_MODEL`、且 `AI_BASE` 是智谱（`bigmodel.cn`）时，自动接上 `glm-4.5-flash`、`glm-4-flash-250414` 兜底；
+- 排队（1305）/ 模型不存在（1211）/ 5xx 就换下一个；账户限流（1302）和 key 错（401）立刻收手，换模型没用。
+
+换供应商只改 `AI_BASE` + `AI_MODEL`，代码一行不动。改完等下一次 push 触发的部署生效。
 
 ### 验证
 
