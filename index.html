@@ -158,6 +158,10 @@
     background:var(--seal);
     opacity:.5;
   }
+  /* 窄屏：标题收到 17px、胶囊贴紧一点，避免两者相交 */
+  @media (max-width:419px){
+    h1{font-size:17px;letter-spacing:.14em;text-indent:.14em}
+  }
 
   /* ── 签 ───────────────────────────── */
   .sign{
@@ -791,6 +795,9 @@
   .ai-btn:hover{color:var(--ink);border-color:rgba(43,38,34,.26);background:var(--paper-hi)}
   .ai-btn.on{color:var(--teal-deep);border-color:rgba(45,105,100,.34);background:rgba(69,149,142,.07)}
   .ai-btn svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  @media (max-width:419px){
+    .ai-btn{right:36px;padding:0 9px;gap:4px}
+  }
   /* 有 AI 条件时右上角一个点，不占布局 */
   .ai-btn.on::after{
     content:"";
