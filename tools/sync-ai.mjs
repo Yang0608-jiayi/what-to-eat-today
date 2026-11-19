@@ -49,7 +49,9 @@ const block = dishes.map((d) => {
 const fresh =
   BEGIN + "\nconst DISHES = `\n" + block.join("\n") + "\n`;\n" + END;
 
-const fn = readFileSync(FN, "utf8");
+/* Windows 检出会把行尾变成 CRLF，而这里生成的块固定用 LF：
+   先归一化再比较，否则 --check 会在干净的仓库上误报「不同步」 */
+const fn = readFileSync(FN, "utf8").replace(/\r\n/g, "\n");
 const i = fn.indexOf(BEGIN);
 const j = fn.indexOf(END);
 if (i < 0 || j < 0) die("pick.mjs 里缺少 DISHES:BEGIN / DISHES:END 标记");
@@ -62,5 +64,6 @@ if (process.argv.includes("--check")) {
   process.exit(0);
 }
 
+/* 统一写回 LF，和仓库里的 blob 保持一致 */
 writeFileSync(FN, next, "utf8");
 console.log("✓ 已同步 " + dishes.length + " 道菜 → netlify/functions/pick.mjs");

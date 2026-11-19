@@ -221,7 +221,7 @@ const SYSTEM =
 
 /* 预览部署也要能用，所以放行 xxx--gilded-griffin-5da339.netlify.app */
 const OK_ORIGIN = /^https:\/\/([a-z0-9-]+--)?gilded-griffin-5da339\.netlify\.app$/;
-const TIMEOUT = 8000;
+const TIMEOUT = 8500;
 
 function json(body, status, cache) {
   const useCache = cache !== false;
@@ -270,11 +270,11 @@ export default async function handler(req) {
     return json({ ok: false, why: "config", miss: miss }, 200, false);
   }
 
-  /* 总共 8s 预算，单次最多 4.5s。超时说明模型此刻就是慢，不再重来；
+  /* 总共 8.5s 预算，单次最多 7s。超时说明模型此刻就是慢，不再重来；
      只有 1305（模型侧排队）/ 5xx / 网络错误才补一次，并且必须还剩 2.6s 以上。 */
   const started = Date.now();
   const budget = TIMEOUT;
-  const ATTEMPT = 4500;
+  const ATTEMPT = 7000;
   const ms = function () { return Date.now() - started; };
 
   async function once() {

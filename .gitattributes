@@ -1,0 +1,3 @@
+# 函数与配置按 LF 存：CRLF 会让 tools/sync-ai.mjs --check 误报「菜库不同步」
+*.mjs text eol=lf
+*.toml text eol=lf
