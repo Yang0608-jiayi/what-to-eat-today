@@ -221,7 +221,7 @@ const SYSTEM =
 
 /* 预览部署也要能用，所以放行 xxx--gilded-griffin-5da339.netlify.app */
 const OK_ORIGIN = /^https:\/\/([a-z0-9-]+--)?gilded-griffin-5da339\.netlify\.app$/;
-const TIMEOUT = 6500;
+const TIMEOUT = 8000;
 
 function json(body, status, cache) {
   const useCache = cache !== false;
@@ -270,15 +270,17 @@ export default async function handler(req) {
     return json({ ok: false, why: "config", miss: miss }, 200, false);
   }
 
-  /* 总共 6.5s 预算：单次最多 3s；429 / 5xx / 网络抖动再补一次。
-     免费模型高峰常回 1305（该模型并发过高），一次重试能救回大半。 */
+  /* 总共 8s 预算，单次最多 4.5s。超时说明模型此刻就是慢，不再重来；
+     只有 1305（模型侧排队）/ 5xx / 网络错误才补一次，并且必须还剩 2.6s 以上。 */
   const started = Date.now();
   const budget = TIMEOUT;
+  const ATTEMPT = 4500;
+  const ms = function () { return Date.now() - started; };
 
   async function once() {
     const left = started + budget - Date.now();
     const ctl = new AbortController();
-    const timer = setTimeout(function () { ctl.abort(); }, Math.max(600, Math.min(3000, left)));
+    const timer = setTimeout(function () { ctl.abort(); }, Math.max(800, Math.min(ATTEMPT, left)));
     try {
       return await fetch(base + "/chat/completions", {
         method: "POST",
@@ -308,7 +310,10 @@ export default async function handler(req) {
     let err = null;
 
     for (let attempt = 0; attempt < 2; attempt++) {
-      if (attempt) await new Promise(function (res) { setTimeout(res, 400); });
+      if (attempt) {
+        if (Date.now() + 2600 > started + budget) break;
+        await new Promise(function (res) { setTimeout(res, 350); });
+      }
       try {
         r = await once();
         err = null;
@@ -317,19 +322,20 @@ export default async function handler(req) {
         err = e;
       }
       if (r && r.ok) break;
-      if (r && r.status !== 429 && r.status < 500) break;
       if (r) {
         /* 上游的错误正文里没有 key，截一段带回来，模型名写错时一眼能看出来 */
         detail = (await r.text().catch(function () { return ""; })).slice(0, 240);
-        /* 1302 = 账户频率限制：越试越糟，直接收手；1305 = 模型侧排队，值得再试一次 */
+        /* 非 429 / 5xx 的错误，换一次也不会好；1302 是账户限流，越试越糟 */
+        if (r.status !== 429 && r.status < 500) break;
         if (r.status === 429 && detail.indexOf("1302") > -1) break;
+      } else if (err && err.name === "AbortError") {
+        break;
       }
-      if (Date.now() + 900 > started + budget) break;
     }
 
     if (!r) {
       const aborted = err && err.name === "AbortError";
-      return json({ ok: false, why: aborted ? "timeout" : "error", detail: String((err && err.message) || "") }, 200, false);
+      return json({ ok: false, why: aborted ? "timeout" : "error", ms: ms(), detail: String((err && err.message) || "") }, 200, false);
     }
     if (!r.ok) {
       const rate = detail.indexOf("1302") > -1;
@@ -337,6 +343,7 @@ export default async function handler(req) {
         ok: false,
         why: rate ? "rate" : (r.status === 429 ? "busy" : "upstream"),
         status: r.status,
+        ms: ms(),
         detail: detail
       }, 200, false);
     }
@@ -344,7 +351,7 @@ export default async function handler(req) {
     const data = await r.json();
     const choice = data && data.choices && data.choices[0];
     const out = parseLoose(choice && choice.message ? choice.message.content : "");
-    if (!out || !Array.isArray(out.dishes)) return json({ ok: false, why: "parse" }, 200, false);
+    if (!out || !Array.isArray(out.dishes)) return json({ ok: false, why: "parse", ms: ms() }, 200, false);
 
     const seen = new Set();
     const dishes = out.dishes
@@ -356,15 +363,16 @@ export default async function handler(req) {
       });
 
     if (dishes.length < 3) {
-      return json({ ok: false, why: "few", got: dishes.length, raw: String(choice && choice.message ? choice.message.content : "").slice(0, 240) }, 200, false);
+      return json({ ok: false, why: "few", ms: ms(), got: dishes.length, raw: String(choice && choice.message ? choice.message.content : "").slice(0, 240) }, 200, false);
     }
 
     return json({
       ok: true,
       dishes: dishes.slice(0, 12),
-      label: String(out.label || "").slice(0, 12)
+      label: String(out.label || "").slice(0, 12),
+      ms: ms()
     });
   } catch (e) {
-    return json({ ok: false, why: e && e.name === "AbortError" ? "timeout" : "error", detail: String((e && e.message) || "") }, 200, false);
+    return json({ ok: false, why: e && e.name === "AbortError" ? "timeout" : "error", ms: ms(), detail: String((e && e.message) || "") }, 200, false);
   }
 }

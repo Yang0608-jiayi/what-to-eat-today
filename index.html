@@ -1250,7 +1250,7 @@
   /* 函数和页面同源，所以是相对路径；Gitee Pages 上没有这个接口，
      按域名判断后连入口都不渲染，那个地址仍然零请求。换自定义域名改这里。 */
   var AI = /\.netlify\.app$/.test(location.hostname) ? "/api/pick" : "";
-  var AI_TIMEOUT = 7000;
+  var AI_TIMEOUT = 9500;
   var AI_CACHE = "jtsmc.ai.";
   var AI_CACHE_TTL = 24 * 3600 * 1000;
   var DISH_BY_NAME = {};
