@@ -255,16 +255,20 @@ export default async function handler(req) {
   if (req.method !== "GET") return json({ ok: false }, 405, false);
 
   const q = (new URL(req.url).searchParams.get("q") || "").trim();
-  if (!q || q.length > 60) return json({ ok: false }, 200, false);
+  if (!q || q.length > 60) return json({ ok: false, why: "q" }, 200, false);
 
   /* 同源请求不带 Origin；带了的就必须是自己人 */
   const origin = req.headers.get("origin");
-  if (origin && !OK_ORIGIN.test(origin)) return json({ ok: false }, 403, false);
+  if (origin && !OK_ORIGIN.test(origin)) return json({ ok: false, why: "origin" }, 403, false);
 
   const base = (process.env.AI_BASE || "").replace(/\/+$/, "");
   const key = process.env.AI_KEY || "";
   const model = process.env.AI_MODEL || "";
-  if (!base || !key || !model) return json({ ok: false }, 200, false);
+  /* why 只说明缺了哪一项，绝不回显值——key 永远是黑的 */
+  if (!base || !key || !model) {
+    const miss = [!base && "AI_BASE", !key && "AI_KEY", !model && "AI_MODEL"].filter(Boolean);
+    return json({ ok: false, why: "config", miss: miss }, 200, false);
+  }
 
   const ctl = new AbortController();
   const timer = setTimeout(function () { ctl.abort(); }, TIMEOUT);
@@ -288,12 +292,16 @@ export default async function handler(req) {
       signal: ctl.signal
     });
     clearTimeout(timer);
-    if (!r.ok) return json({ ok: false }, 200, false);
+    if (!r.ok) {
+      /* 上游的错误正文里没有 key，截一段带回来，模型名写错时一眼能看出来 */
+      const detail = (await r.text().catch(function () { return ""; })).slice(0, 240);
+      return json({ ok: false, why: "upstream", status: r.status, detail: detail }, 200, false);
+    }
 
     const data = await r.json();
     const choice = data && data.choices && data.choices[0];
     const out = parseLoose(choice && choice.message ? choice.message.content : "");
-    if (!out || !Array.isArray(out.dishes)) return json({ ok: false }, 200, false);
+    if (!out || !Array.isArray(out.dishes)) return json({ ok: false, why: "parse" }, 200, false);
 
     const seen = new Set();
     const dishes = out.dishes
@@ -304,7 +312,9 @@ export default async function handler(req) {
         return true;
       });
 
-    if (dishes.length < 3) return json({ ok: false }, 200, false);
+    if (dishes.length < 3) {
+      return json({ ok: false, why: "few", got: dishes.length, raw: String(choice && choice.message ? choice.message.content : "").slice(0, 240) }, 200, false);
+    }
 
     return json({
       ok: true,
@@ -313,6 +323,6 @@ export default async function handler(req) {
     });
   } catch (e) {
     clearTimeout(timer);
-    return json({ ok: false }, 200, false);
+    return json({ ok: false, why: e && e.name === "AbortError" ? "timeout" : "error", detail: String(e && e.message || "") }, 200, false);
   }
 }

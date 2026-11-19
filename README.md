@@ -130,7 +130,12 @@ https://你的站点.netlify.app/api/pick?q=感冒了
 ```
 
 - 正常：`{"ok":true,"dishes":[...],"label":"..."}`
-- 一直 `{"ok":false}`：看 Netlify → Functions → `pick` → 日志，多半是 key / base / model 三者之一不对
+- 失败：`{"ok":false,"why":"…"}`，`why` 直接说明卡在哪一步，先看它再翻日志：
+  - `config` → 环境变量没配齐，`miss` 里列出缺哪个（key 的值永远不会回显）
+  - `upstream` → 供应商返回非 2xx，`status` + `detail` 是它的原文（模型名写错最常见）
+  - `parse` / `few` → 模型答得不是 JSON，或有效菜名不足 3 道
+  - `timeout` / `error` → 5 秒超时或网络异常
+- 仍然排除不了就看 Netlify → Functions → `pick` → 日志。
 
 ### 改菜库之后
 
