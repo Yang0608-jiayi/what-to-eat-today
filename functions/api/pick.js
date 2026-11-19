@@ -512,7 +512,7 @@ function originAllowed(origin) {
   }
 }
 
-const TIMEOUT = 9000;
+const TIMEOUT = 20000;
 const CACHE_TTL = 86400;
 
 /* 下面两个是可选的请求参数，不是每家供应商都认。被 400 明确拒绝过一次就记住，
@@ -625,7 +625,7 @@ async function run(req, env) {
      1305（排队）/ 1211（模型不存在）/ 5xx / 网络错误 / 超时 都换下一个。 */
   const started = Date.now();
   const budget = TIMEOUT;
-  const ATTEMPT = 4200;
+  const ATTEMPT = 9000;
   const ms = function () { return Date.now() - started; };
 
   async function once(name) {
