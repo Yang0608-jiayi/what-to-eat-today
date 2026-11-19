@@ -14,7 +14,14 @@ const HTML = path.join(ROOT, "index.html");
 const ALLOWED = ["辣", "清淡", "重口", "面", "荤", "素", "海鲜"];
 const FLAVORS = ["辣", "清淡", "重口"];
 const KINDS = ["荤", "素"];
-const EXPECTED_TOTAL = 180;
+const EXPECTED_TOTAL = 450;
+/* 扩库时只改 EXPECTED_TOTAL，下面全是比例 */
+const FLOORS = [["素", 0.40], ["面", 0.15], ["海鲜", 0.06], ["清淡", 0.39]];
+const SPICY_MAX_RATIO = 0.24;
+const SOUP_MIN = 24;
+const STAPLE_MIN = 100;
+const SIDE_MIN = 300;
+const GENTLE_SOUP_MIN = 8;
 const DESC_MIN = 8;
 const DESC_MAX = 12;
 
@@ -116,6 +123,19 @@ for (const [i, d] of dishes.entries()) {
   else seenTagSet.set(sig, [d.name]);
 }
 
+/* ── 近似重名（只提醒，不阻断）─────────── */
+const allNames = [...seenName.keys()];
+for (let i = 0; i < allNames.length; i++) {
+  for (let j = i + 1; j < allNames.length; j++) {
+    const a = allNames[i];
+    const b = allNames[j];
+    if (a.length !== b.length || a.length < 3) continue;
+    let diff = 0;
+    for (let k = 0; k < a.length && diff < 2; k++) if (a[k] !== b[k]) diff++;
+    if (diff === 1) warnings.push("近名：「" + a + "」和「" + b + "」只差一个字");
+  }
+}
+
 /* ── 8 种 chip 组合 ─────────────────── */
 function match(d, noSpicy, gentle, noodle) {
   const t = d.tags;
@@ -178,29 +198,27 @@ if (dishes.length !== EXPECTED_TOTAL) {
   fail("总数 " + dishes.length + " 道，预期 " + EXPECTED_TOTAL + " 道");
 }
 
-const floors = [
-  ["素", 72],
-  ["面", 30],
-  ["海鲜", 16],
-  ["清淡", 70],
-];
-for (const [tag, min] of floors) {
-  if (dist[tag] < min) fail(tag + " 只有 " + dist[tag] + " 道，低于下限 " + min);
+for (const [tag, ratio] of FLOORS) {
+  const min = Math.ceil(EXPECTED_TOTAL * ratio);
+  if (dist[tag] < min) {
+    fail(tag + " 只有 " + dist[tag] + " 道，低于下限 " + min + "（" + Math.round(ratio * 100) + "%）");
+  }
 }
-if (dist.辣 > 60) fail("辣 " + dist.辣 + " 道，超过上限 60");
+const spicyMax = Math.floor(EXPECTED_TOTAL * SPICY_MAX_RATIO);
+if (dist.辣 > spicyMax) fail("辣 " + dist.辣 + " 道，超过上限 " + spicyMax + "（" + Math.round(SPICY_MAX_RATIO * 100) + "%）");
 
 /* ── 一餐：汤池 / 自带主食 / 配菜 ───────── */
 const soups = dishes.filter((d) => d.soup === 1);
 const staples = dishes.filter((d) => d.staple === 1);
 const sides = dishes.filter((d) => d.soup !== 1 && d.staple !== 1);
 
-if (soups.length < 12) fail("汤池只有 " + soups.length + " 道，低于下限 12");
-if (staples.length < 40) fail("自带主食只有 " + staples.length + " 道，低于下限 40");
-if (sides.length < 100) fail("可当配菜的只有 " + sides.length + " 道，低于下限 100，加菜会很快无解");
+if (soups.length < SOUP_MIN) fail("汤池只有 " + soups.length + " 道，低于下限 " + SOUP_MIN);
+if (staples.length < STAPLE_MIN) fail("自带主食只有 " + staples.length + " 道，低于下限 " + STAPLE_MIN);
+if (sides.length < SIDE_MIN) fail("可当配菜的只有 " + sides.length + " 道，低于下限 " + SIDE_MIN + "，加菜会很快无解");
 
 /* 「不吃辣 + 清淡点」下汤池必须还有得选 */
 const gentleSoups = soups.filter((d) => !d.tags.includes("辣") && d.tags.includes("清淡"));
-if (gentleSoups.length < 4) fail("清淡汤池只有 " + gentleSoups.length + " 道，低于下限 4");
+if (gentleSoups.length < GENTLE_SOUP_MIN) fail("清淡汤池只有 " + gentleSoups.length + " 道，低于下限 " + GENTLE_SOUP_MIN);
 
 /* ── 输出 ───────────────────────────── */
 console.log("菜库总数：" + dishes.length + " 道\n");
